@@ -15,7 +15,7 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 |---|---|---|
 | Go engine: brute-force search (correctness oracle) | done | `engine/flat.go` |
 | Go engine: Lloyd's k-means | done | `engine/kmeans.go` |
-| Go engine: IVF-Flat index | planned | `engine/ivf.go` |
+| Go engine: IVF-Flat index | done | `engine/ivf.go` |
 | Go engine: benchmark binary | planned | `engine/cmd/vcbench/main.go` |
 | Python reference: brute-force search | done | `vecstore/flat.py` |
 | Python reference: Lloyd's k-means | done | `vecstore/kmeans.py` |
