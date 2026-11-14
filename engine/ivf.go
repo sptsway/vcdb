@@ -24,13 +24,20 @@ type IVF struct {
 	scratch    sync.Pool // per-query buffers, reused to avoid allocation
 }
 
+// searchBuf is the working memory of one query.
+type searchBuf struct {
+	cd      []float32 // distance from the query to every centroid
+	closest TopK      // the nprobe nearest centroids
+	top     TopK      // the k best vectors
+}
+
 func NewIVF(dim, nlist int, seed uint64) *IVF {
 	ix := &IVF{
 		dim: dim, nlist: nlist, seed: seed,
 		vecs: make([][]float32, nlist),
 		ids:  make([][]int64, nlist),
 	}
-	ix.scratch.New = func() any { return make([]float32, nlist) }
+	ix.scratch.New = func() any { return &searchBuf{cd: make([]float32, nlist)} }
 	return ix
 }
 
@@ -69,24 +76,24 @@ func (ix *IVF) Search(q []float32, k, nprobe int) []Neighbor {
 	ix.mustBeTrained()
 	nprobe = min(nprobe, ix.nlist)
 
+	buf := ix.scratch.Get().(*searchBuf)
+	defer ix.scratch.Put(buf)
+
 	// Step 1: rank the centroids by distance to the query.
-	cd := ix.scratch.Get().([]float32)
-	defer ix.scratch.Put(cd)
-	ix.cents.Dists(q, cd)
-	closest := NewTopK(nprobe)
-	for l, d := range cd {
-		closest.Push(int64(l), d)
+	ix.cents.Dists(q, buf.cd)
+	buf.closest.Reset(nprobe)
+	for l, d := range buf.cd {
+		if d <= buf.closest.Worst() {
+			buf.closest.Push(int64(l), d)
+		}
 	}
 
 	// Step 2: scan the chosen lists with exact distances.
-	top := NewTopK(k)
-	for _, c := range closest.items {
-		vecs, ids := ix.vecs[c.ID], ix.ids[c.ID]
-		for i, id := range ids {
-			top.Push(id, L2Sq(q, vecs[i*ix.dim:(i+1)*ix.dim]))
-		}
+	buf.top.Reset(k)
+	for _, c := range buf.closest.items {
+		scanRows(&buf.top, q, ix.vecs[c.ID], ix.ids[c.ID], 0)
 	}
-	return top.Sorted()
+	return buf.top.Sorted()
 }
 
 // SearchBatch answers many queries at once. qs holds the queries back to back.
