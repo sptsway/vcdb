@@ -30,9 +30,7 @@ func (f *Flat) Add(x []float32) {
 // It returns fewer than k if the index holds fewer vectors.
 func (f *Flat) Search(q []float32, k int) []Neighbor {
 	top := NewTopK(k)
-	for i := 0; i < f.Len(); i++ {
-		top.Push(int64(i), L2Sq(q, f.data[i*f.dim:(i+1)*f.dim]))
-	}
+	scanRows(top, q, f.data, nil, 0)
 	return top.Sorted()
 }
 

@@ -31,6 +31,12 @@ func NewTopK(k int) *TopK {
 	return &TopK{k: k, items: make([]Neighbor, 0, k)}
 }
 
+// Reset empties the heap and sets a new k, keeping the memory.
+func (t *TopK) Reset(k int) {
+	t.k = k
+	t.items = t.items[:0]
+}
+
 // Worst returns the distance a candidate must beat to get in.
 // It is +Inf until k neighbours have been collected.
 func (t *TopK) Worst() float32 {
@@ -53,9 +59,10 @@ func (t *TopK) Push(id int64, dist float32) {
 	}
 }
 
-// Sorted returns the kept neighbours, best first. It empties the heap.
+// Sorted returns the kept neighbours, best first, in a new slice.
+// The heap is left in an undefined order. Call Reset before reusing it.
 func (t *TopK) Sorted() []Neighbor {
-	out := t.items
+	out := slices.Clone(t.items)
 	slices.SortFunc(out, func(a, b Neighbor) int {
 		switch {
 		case better(a, b):
@@ -65,7 +72,6 @@ func (t *TopK) Sorted() []Neighbor {
 		}
 		return 0
 	})
-	t.items = nil
 	return out
 }
 

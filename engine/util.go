@@ -3,10 +3,15 @@ package engine
 import (
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
-// parallelFor splits 0..n into chunks and runs fn on each chunk in its own
-// goroutine. workers <= 0 means one worker per CPU core.
+// parallelFor runs fn over 0..n in small chunks shared by a pool of goroutines.
+// workers <= 0 means one worker per CPU core.
+//
+// Workers take the next chunk when they finish the last one, instead of being
+// handed equal slices up front. On a chip with fast and slow cores this keeps
+// the fast cores busy while a slow core finishes its chunk.
 func parallelFor(n, workers int, fn func(lo, hi int)) {
 	if workers <= 0 {
 		workers = runtime.NumCPU()
@@ -18,14 +23,20 @@ func parallelFor(n, workers int, fn func(lo, hi int)) {
 		}
 		return
 	}
+	grain := min(max(n/(workers*32), 1), 1024)
+	var next atomic.Int64
 	var wg sync.WaitGroup
-	chunk := (n + workers - 1) / workers
-	for lo := 0; lo < n; lo += chunk {
-		hi := min(lo+chunk, n)
+	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fn(lo, hi)
+			for {
+				lo := int(next.Add(int64(grain))) - grain
+				if lo >= n {
+					return
+				}
+				fn(lo, min(lo+grain, n))
+			}
 		}()
 	}
 	wg.Wait()
