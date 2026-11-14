@@ -12,3 +12,7 @@ data/
 .claude/
 CLAUDE.md
 .DS_Store
+
+# Go build output
+/bin/
+engine/bin/
