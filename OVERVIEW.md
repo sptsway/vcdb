@@ -15,8 +15,8 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 |---|---|---|
 | Brute-force search (correctness oracle) | done | `vecstore/flat.py` |
 | Lloyd's k-means | done | `vecstore/kmeans.py` |
-| IVF-Flat index | planned | `vecstore/ivf.py` |
-| Tests | in progress | `tests/test_flat.py` |
+| IVF-Flat index | done | `vecstore/ivf.py` |
+| Tests | done | `tests/test_ivf.py` |
 | Benchmark against Faiss | planned | `bench/compare.py` |
 | Benchmark charts | planned | `bench/plot.py` |
 | Plain-English walkthrough | planned | `docs/walkthrough.md` |
