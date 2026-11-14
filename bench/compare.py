@@ -1,15 +1,14 @@
-"""Compare vecstore's IVF-Flat with faiss.IndexIVFFlat on sift-128-euclidean.
+"""Measure faiss.IndexIVFFlat on sift-128-euclidean. This is the baseline.
 
-Writes CSVs into results/. Nothing here is typed in by hand.
+The Go engine is measured by engine/cmd/vcbench on the same vectors, with the
+same nlist and the same number of k-means iterations. Both write CSVs into
+results/. Nothing here is typed in by hand.
 
-Fairness rules:
-  * Both indexes train on the same vectors with the same nlist and the
-    same number of k-means iterations.
+Rules that match the Go benchmark:
   * Query speed is measured one query per call. Faiss is held to one thread.
     Each figure is the fastest of several passes. Other programs on the
     machine can only slow a pass down, never speed it up.
-  * Ground truth comes from vecstore's own flat index. It is cross-checked
-    against faiss.IndexFlatL2 on a sample of queries.
+  * Ground truth is faiss.IndexFlatL2 (bench/groundtruth.py).
 """
 import argparse
 import csv
@@ -25,11 +24,9 @@ import h5py
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-from vecstore.flat import FlatIndex  # noqa: E402
-from vecstore.ivf import IVFFlat  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from groundtruth import K, ground_truth  # noqa: E402
 
-K = 10
 NPROBES = [1, 4, 16, 64]
 WRITE_BATCHES = [1, 100, 1000, 10000]
 RESULTS = ROOT / "results"
@@ -49,26 +46,6 @@ def recall_at_k(found, truth):
     """Share of the true top-k ids that the index returned."""
     hits = sum(len(set(f) & set(t)) for f, t in zip(found, truth))
     return hits / truth.size
-
-
-def ground_truth(train, queries, tag):
-    """Exact neighbours from vecstore's flat index, cached on disk."""
-    cache = ROOT / "data" / f"gt_{tag}.npy"
-    if cache.exists():
-        return np.load(cache)
-    flat = FlatIndex(train.shape[1])
-    flat.add(train)
-    _, ids = flat.search(queries, K)
-    np.save(cache, ids)
-    return ids
-
-
-def faiss_agreement(train, queries, truth, sample=1000):
-    """How often vecstore's flat ids equal faiss.IndexFlatL2 on a sample."""
-    ref = faiss.IndexFlatL2(train.shape[1])
-    ref.add(train)
-    _, ids = ref.search(queries[:sample], K)
-    return recall_at_k(truth[:sample], ids)
 
 
 def time_queries(search_one, queries, repeats=7, warmup=200):
@@ -116,19 +93,8 @@ def main():
 
     print("ground truth")
     truth = ground_truth(train, queries, tag)
-    agree = faiss_agreement(train, queries, truth)
-    print(f"  agreement with faiss.IndexFlatL2: {agree:.4f}")
 
-    # ---- build both indexes -------------------------------------------------
-    print("build vecstore")
-    mine = IVFFlat(dim, args.nlist, seed=0)
-    t = time.perf_counter()
-    mine.train(train, iters=args.iters)
-    mine_train = time.perf_counter() - t
-    t = time.perf_counter()
-    mine.add(train)
-    mine_add = time.perf_counter() - t
-
+    # ---- build --------------------------------------------------------------
     print("build faiss")
     quant = faiss.IndexFlatL2(dim)
     ref = faiss.IndexIVFFlat(quant, dim, args.nlist)
@@ -145,17 +111,8 @@ def main():
     write_csv(
         f"build_{tag}.csv",
         ["impl", "n", "nlist", "train_s", "add_s", "add_vectors_per_s"],
-        [
-            ["vecstore", args.n, args.nlist, f"{mine_train:.2f}", f"{mine_add:.2f}",
-             f"{args.n / mine_add:.0f}"],
-            ["faiss", args.n, args.nlist, f"{ref_train:.2f}", f"{ref_add:.2f}",
-             f"{args.n / ref_add:.0f}"],
-        ],
-    )
-    write_csv(
-        f"kmeans_loss_{tag}.csv",
-        ["iteration", "loss"],
-        [[i + 1, f"{v:.1f}"] for i, v in enumerate(mine.train_losses)],
+        [["faiss", args.n, args.nlist, f"{ref_train:.2f}", f"{ref_add:.2f}",
+          f"{args.n / ref_add:.0f}"]],
     )
 
     # ---- read benchmark -----------------------------------------------------
@@ -163,24 +120,18 @@ def main():
     rows = []
     for nprobe in NPROBES:
         ref.nprobe = nprobe
-        _, i_mine = mine.search(queries, K, nprobe)
         faiss.omp_set_num_threads(1)
-        _, i_ref = ref.search(queries, K)
-        qps_mine = time_queries(lambda q: mine.search(q, K, nprobe), queries)
-        qps_ref = time_queries(lambda q: ref.search(q[None, :], K), queries)
+        _, ids = ref.search(queries, K)
+        qps_single = time_queries(lambda q: ref.search(q[None, :], K), queries)
         faiss.omp_set_num_threads(MAX_THREADS)
         qps_batch = max(
             _timed(lambda: ref.search(queries, K), len(queries)) for _ in range(7)
         )
-        for name, ids, qps in [
-            ("vecstore", i_mine, qps_mine),
-            ("faiss", i_ref, qps_ref),
-            ("faiss_batch", i_ref, qps_batch),
-        ]:
-            rows.append([name, args.n, args.nlist, nprobe,
-                         f"{recall_at_k(ids, truth):.4f}", f"{qps:.0f}"])
-        print(f"  nprobe={nprobe:>3}  vecstore {qps_mine:8.0f} qps"
-              f"  faiss {qps_ref:8.0f} qps  recall {recall_at_k(i_mine, truth):.4f}")
+        recall = recall_at_k(ids, truth)
+        for name, qps in (("faiss", qps_single), ("faiss_batch", qps_batch)):
+            rows.append([name, args.n, args.nlist, nprobe, f"{recall:.4f}", f"{qps:.0f}"])
+        print(f"  nprobe={nprobe:>3}  recall {recall:.4f}  single {qps_single:8.0f} qps"
+              f"  batch {qps_batch:9.0f} qps")
     write_csv(f"recall_qps_{tag}.csv",
               ["impl", "n", "nlist", "nprobe", "recall_at_10", "qps"], rows)
 
@@ -192,11 +143,8 @@ def main():
         total = max(batch, 5000)
         chunk = np.ascontiguousarray(extra[used : used + total])
         used += total
-        rows.append(["vecstore", batch, total,
-                     f"{time_adds(mine.add, chunk, batch, total):.0f}"])
-        rows.append(["faiss", batch, total,
-                     f"{time_adds(ref.add, chunk, batch, total):.0f}"])
-        print(f"  batch={batch:>5}  vecstore {rows[-2][3]:>8} v/s  faiss {rows[-1][3]:>8} v/s")
+        rows.append(["faiss", batch, total, f"{time_adds(ref.add, chunk, batch, total):.0f}"])
+        print(f"  batch={batch:>5}  faiss {rows[-1][3]:>8} v/s")
     # The same inserts again with faiss free to use every core.
     faiss.omp_set_num_threads(MAX_THREADS)
     for batch in WRITE_BATCHES:
@@ -212,9 +160,9 @@ def main():
                          capture_output=True, text=True).stdout.strip()
     peak_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2  # bytes on macOS
     header = ["run", "n", "nlist", "kmeans_iters", "queries", "python", "numpy",
-              "faiss", "cpu", "peak_rss_mb", "flat_agreement_with_faiss"]
+              "faiss", "cpu", "peak_rss_mb"]
     row = [tag, args.n, args.nlist, args.iters, len(queries), platform.python_version(),
-           np.__version__, faiss.__version__, cpu, f"{peak_mb:.0f}", f"{agree:.4f}"]
+           np.__version__, faiss.__version__, cpu, f"{peak_mb:.0f}"]
     info = RESULTS / "run_info.csv"
     old = []
     if info.exists():

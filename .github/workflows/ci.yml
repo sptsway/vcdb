@@ -26,12 +26,3 @@ jobs:
       # The purego tag turns the assembly off, so the portable path is tested on arm64 too.
       - run: go test -race -count=1 -tags purego ./...
 
-  python:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - run: pip install numpy pytest
-      - run: pytest -v

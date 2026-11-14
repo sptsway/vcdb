@@ -4,9 +4,9 @@ Each chart is written twice (light and dark) into docs/img/. The README picks
 the right one with a <picture> tag. Colours come from a palette that passed the
 colour-blind and contrast checks in both themes.
 
-Three implementations are drawn. Colour follows the implementation, never its
-rank: Go is blue, the Python reference is aqua, Faiss is orange. A dashed line
-means batched search on all cores.
+Two implementations are drawn. Colour follows the implementation, never its
+rank: Go is blue, Faiss is orange. A dashed line means batched search or
+inserts on all cores.
 """
 import csv
 from pathlib import Path
@@ -23,19 +23,18 @@ OUT = ROOT / "docs" / "img"
 
 THEMES = {
     "light": dict(surface="#fcfcfb", ink="#0b0b0b", ink2="#52514e", grid="#e4e3df",
-                  blue="#2a78d6", orange="#eb6834", aqua="#1baf7a"),
+                  blue="#2a78d6", orange="#eb6834"),
     "dark": dict(surface="#1a1a19", ink="#f0efec", ink2="#c3c2b7", grid="#34332f",
-                 blue="#3987e5", orange="#d95926", aqua="#199e70"),
+                 blue="#3987e5", orange="#d95926"),
 }
 # key in the CSV -> (legend label, colour, line style, marker)
 SERIES = {
     "vecstore_go": ("vecstore, Go engine", "blue", "-", "o"),
-    "vecstore": ("vecstore, Python reference", "aqua", "-", "D"),
     "faiss": ("faiss IVFFlat, 1 thread", "orange", "-", "s"),
     "vecstore_go_batch": ("vecstore Go, batched, all cores", "blue", "--", "^"),
     "faiss_batch": ("faiss, batched, all cores", "orange", "--", "v"),
 }
-SINGLE = ("vecstore_go", "vecstore", "faiss")
+SINGLE = ("vecstore_go", "faiss")
 SIZES = {"200k": "200,000 vectors, nlist 1024", "1m": "1,000,000 vectors, nlist 4096"}
 
 
@@ -48,7 +47,7 @@ def read(name):
 
 
 def merged(stem, tag):
-    """Python/Faiss rows plus Go rows for the same run, or None if absent."""
+    """Faiss rows plus Go rows for the same run, or None if absent."""
     rows = read(f"{stem}_{tag}.csv") + read(f"go_{stem}_{tag}.csv")
     return rows or None
 
@@ -151,12 +150,12 @@ def chart_recall(tag, rows, theme):
                        "nprobe (lists searched per query)", "recall@10")
     data = by_impl(rows, "nprobe", "recall_at_10")
     pos = positions(data)
-    # Big marker at the back, small at the front, so all three stay visible.
-    for key, size, z in (("faiss", 15, 3), ("vecstore", 10, 4), ("vecstore_go", 5, 5)):
+    # Big marker at the back, small at the front, so both stay visible.
+    for key, size, z in (("faiss", 12, 3), ("vecstore_go", 6, 4)):
         if key in data:
             line(ax, t, key, [pos[x] for x, _ in data[key]], [y for _, y in data[key]], size, z)
     last = max(pos.values())
-    for key, name, dy in (("vecstore_go", "Go", 14), ("vecstore", "Python", 0), ("faiss", "faiss", -14)):
+    for key, name, dy in (("vecstore_go", "Go", 9), ("faiss", "faiss", -9)):
         if key in data:
             end_label(ax, t, last, data[key][-1][1], f"{name} {data[key][-1][1]:.4f}", dy)
     categorical_x(ax, pos, lambda n: f"{int(n)}")
@@ -171,7 +170,7 @@ def chart_qps(tag, rows, theme):
     data = by_impl(rows, "nprobe", "qps")
     pos = positions(data)
     ends = []
-    for key in ("vecstore_go", "vecstore", "faiss", "vecstore_go_batch", "faiss_batch"):
+    for key in ("vecstore_go", "faiss", "vecstore_go_batch", "faiss_batch"):
         if key not in data:
             continue
         pts = data[key]
@@ -222,7 +221,7 @@ def chart_writes(tag, rows, theme):
     data = by_impl(rows, "batch_size", "vectors_per_s")
     pos = positions(data)
     ends = []
-    for key in ("vecstore_go", "vecstore", "faiss", "vecstore_go_batch", "faiss_batch"):
+    for key in ("vecstore_go", "faiss", "vecstore_go_batch", "faiss_batch"):
         if key not in data:
             continue
         pts = data[key]
@@ -242,7 +241,7 @@ def chart_build(tag, rows, theme):
     keys = [k for k in SINGLE if any(r["impl"] == k for r in rows)]
     train = {r["impl"]: float(r["train_s"]) for r in rows}
     add = {r["impl"]: float(r["add_s"]) for r in rows}
-    names = {"vecstore_go": "Go engine", "vecstore": "Python reference", "faiss": "faiss"}
+    names = {"vecstore_go": "Go engine", "faiss": "faiss"}
     peak = max(train[k] + add[k] for k in keys)
     for i, key in enumerate(keys):
         colour = SERIES[key][1]
@@ -269,7 +268,7 @@ def chart_loss(tag, curves, theme):
     ax.set_xticks([1, 5, 10, 15, 20])
     power = len(str(int(max(float(r["loss"]) for rows in curves.values() for r in rows)))) - 1
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 10**power:.1f}e{power}"))
-    finish(fig, ax, t, "kmeans_loss", tag, theme)
+    finish(fig, ax, t, "kmeans_loss", tag, theme, legend=False)
 
 
 def main():
@@ -280,8 +279,8 @@ def main():
             print(f"{tag}: no result yet, skipping")
             continue
         build, writes = merged("build", tag), merged("write_qps", tag)
-        curves = {k: read(n) for k, n in (("vecstore", f"kmeans_loss_{tag}.csv"),
-                                          ("vecstore_go", f"go_kmeans_loss_{tag}.csv")) if read(n)}
+        curves = {"vecstore_go": read(f"go_kmeans_loss_{tag}.csv")}
+        curves = {k: v for k, v in curves.items() if v}
         for theme in THEMES:
             chart_recall(tag, recall, theme)
             chart_qps(tag, recall, theme)
