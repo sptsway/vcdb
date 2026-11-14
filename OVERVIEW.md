@@ -66,18 +66,44 @@ Every number below is read from a CSV in `results/`.
 
 ### Recall and queries per second, 1M vectors
 
-no result yet
+| impl | n | nlist | nprobe | recall_at_10 | qps |
+|---|---|---|---|---|---|
+| vecstore | 1000000 | 4096 | 1 | 0.2881 | 23998 |
+| faiss | 1000000 | 4096 | 1 | 0.2885 | 27874 |
+| faiss_batch | 1000000 | 4096 | 1 | 0.2885 | 105759 |
+| vecstore | 1000000 | 4096 | 4 | 0.5777 | 10795 |
+| faiss | 1000000 | 4096 | 4 | 0.5798 | 17456 |
+| faiss_batch | 1000000 | 4096 | 4 | 0.5798 | 90941 |
+| vecstore | 1000000 | 4096 | 16 | 0.8453 | 6155 |
+| faiss | 1000000 | 4096 | 16 | 0.8462 | 11454 |
+| faiss_batch | 1000000 | 4096 | 16 | 0.8462 | 44453 |
+| vecstore | 1000000 | 4096 | 64 | 0.9750 | 2127 |
+| faiss | 1000000 | 4096 | 64 | 0.9742 | 4166 |
+| faiss_batch | 1000000 | 4096 | 64 | 0.9742 | 20774 |
 
 ### Build and write throughput, 1M vectors
 
-no result yet
+| impl | n | nlist | train_s | add_s | add_vectors_per_s |
+|---|---|---|---|---|---|
+| vecstore | 1000000 | 4096 | 76.50 | 3.57 | 279854 |
+| faiss | 1000000 | 4096 | 67.33 | 3.62 | 276226 |
 
 ### Insert throughput by batch size, 1M vectors
 
-no result yet
+| impl | batch_size | vectors | vectors_per_s |
+|---|---|---|---|
+| vecstore | 1 | 5000 | 1542 |
+| faiss | 1 | 5000 | 32234 |
+| vecstore | 100 | 5000 | 51513 |
+| faiss | 100 | 5000 | 36301 |
+| vecstore | 1000 | 5000 | 88319 |
+| faiss | 1000 | 5000 | 306600 |
+| vecstore | 10000 | 10000 | 160166 |
+| faiss | 10000 | 10000 | 315314 |
 
 ### Run environment
 
 | run | n | nlist | kmeans_iters | queries | python | numpy | faiss | cpu | peak_rss_mb | flat_agreement_with_faiss |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 200k | 200000 | 1024 | 20 | 10000 | 3.13.17 | 2.5.4 | 1.16.0 | Apple M4 Pro | 2340 | 0.9999 |
+| 1m | 1000000 | 4096 | 20 | 10000 | 3.13.17 | 2.5.4 | 1.16.0 | Apple M4 Pro | 2492 | 0.9994 |

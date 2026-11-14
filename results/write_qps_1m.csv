@@ -1,0 +1,9 @@
+impl,batch_size,vectors,vectors_per_s
+vecstore,1,5000,1542
+faiss,1,5000,32234
+vecstore,100,5000,51513
+faiss,100,5000,36301
+vecstore,1000,5000,88319
+faiss,1000,5000,306600
+vecstore,10000,10000,160166
+faiss,10000,10000,315314
