@@ -63,3 +63,21 @@ def test_topk_breaks_ties_by_id():
     dist = np.array([[1.0, 1.0, 1.0, 0.5]], dtype=np.float32)
     _, ids = topk(dist, np.array([7, 3, 5, 9]), 3)
     assert list(ids[0]) == [9, 3, 5]
+
+
+def test_topk_keeps_smallest_ids_when_ties_straddle_the_cutoff():
+    # Every row is all ties, so which ids enter the top k is decided by the
+    # tie-break alone. A partition-first implementation picks arbitrary ids.
+    rng = np.random.default_rng(0)
+    ids = np.stack([rng.permutation(40) for _ in range(200)]).astype(np.int64)
+    dist = np.ones((200, 40), dtype=np.float32)
+    _, got = topk(dist, ids, 5)
+    assert np.array_equal(got, np.tile(np.arange(5), (200, 1)))
+
+
+def test_topk_ties_at_the_boundary_with_distinct_values_before_it():
+    # Two clear winners, then a block of ties competing for the last slot.
+    dist = np.array([[0.1, 0.2, 0.5, 0.5, 0.5, 0.5, 0.9]], dtype=np.float32)
+    ids = np.array([40, 30, 20, 10, 50, 0, 60], dtype=np.int64)
+    _, got = topk(dist, ids, 3)
+    assert list(got[0]) == [40, 30, 0]
