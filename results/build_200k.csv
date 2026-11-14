@@ -1,3 +1,2 @@
 impl,n,nlist,train_s,add_s,add_vectors_per_s
-vecstore,200000,1024,6.44,0.23,851901
-faiss,200000,1024,3.13,0.16,1225362
+faiss,200000,1024,3.20,0.18,1090798

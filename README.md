@@ -1,10 +1,14 @@
 # vcdb
 
-A small vector index built from scratch in Python and NumPy.
+[![ci](https://github.com/sptsway/vcdb/actions/workflows/ci.yml/badge.svg)](https://github.com/sptsway/vcdb/actions/workflows/ci.yml)
 
-It finds the nearest neighbours of a query among a million vectors. It uses an IVF-Flat index. The code is short and tested. It is benchmarked against Faiss.
+A small vector index written from scratch in Go.
 
-Everything here was written by hand. Faiss is used only as a baseline in `bench/`.
+It finds the nearest neighbours of a query among a million vectors. It uses an IVF-Flat index. The hot loops are hand-written arm64 assembly. A portable Go version runs everywhere else.
+
+Python is used only for the benchmark. It runs Faiss, the baseline, and draws the charts.
+
+Everything was written by hand. Faiss is used only as a baseline in `bench/`.
 
 ## What it does
 
@@ -25,13 +29,28 @@ flowchart LR
     S --> K[Top k results]
 ```
 
+Using it from Go:
+
+```go
+ix := engine.NewIVF(128, 1024, 0)  // dimension, number of lists, seed
+ix.Train(sample, 20, 0)            // vectors, k-means rounds, workers (0 = all cores)
+ix.Add(vectors, nil, 0)            // callable again at any later time
+hits := ix.Search(query, 10, 16)   // query, k, nprobe
+fmt.Println(hits[0].ID, hits[0].Dist)
+```
+
 ## Results at a glance
+
+Two implementations are compared.
+
+- **Go engine.** The main project.
+- **Faiss.** `faiss.IndexIVFFlat`, the baseline.
 
 All numbers come from the CSV files in `results/`. The scripts that make this section read those files. Nothing is typed in by hand.
 
 <!-- headline:start -->
-- **1,000,000 vectors, nlist 4096.** Recall@10 reaches 0.975 at nprobe 64. It never differs from faiss by more than 0.0021. Faiss on one thread is 1.2x to 2.0x faster per query. Peak memory was 2,492 MB.
-- **200,000 vectors, nlist 1024.** Recall@10 reaches 0.993 at nprobe 64. It never differs from faiss by more than 0.0031. Faiss on one thread is 1.9x to 2.4x faster per query. Peak memory was 2,340 MB.
+- **1,000,000 vectors, nlist 4096.** The Go engine reaches recall@10 of 0.975 at nprobe 64. It never differs from faiss by more than 0.0030. On one thread it runs at 70% to 92% of faiss's query speed. Training takes 1.9x as long as faiss. Peak memory was 1,688 MB.
+- **200,000 vectors, nlist 1024.** The Go engine reaches recall@10 of 0.994 at nprobe 64. It never differs from faiss by more than 0.0030. On one thread it runs at 80% to 108% of faiss's query speed. Training takes 1.9x as long as faiss. Peak memory was 470 MB.
 <!-- headline:end -->
 
 Dataset: `sift-128-euclidean` from ann-benchmarks. Vectors have 128 dimensions. There are 10,000 queries.
@@ -41,10 +60,10 @@ Recall@10 is the share of the true 10 nearest neighbours that the index returns.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/recall_vs_qps_1m_dark.png">
-  <img alt="Recall at 10 against queries per second for vecstore and faiss on 1,000,000 vectors" src="docs/img/recall_vs_qps_1m_light.png">
+  <img alt="Recall at 10 against queries per second for the Go engine and faiss on 1,000,000 vectors" src="docs/img/recall_vs_qps_1m_light.png">
 </picture>
 
-Both indexes sit on almost the same recall curve. The index design is the same. Faiss is faster at every point. Its inner loops are optimised C++.
+The two indexes sit on almost the same recall curve. They use the same design. Only the speed differs.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/recall_vs_nprobe_1m_dark.png">
@@ -56,7 +75,7 @@ Both indexes sit on almost the same recall curve. The index design is the same. 
   <img alt="Queries per second as nprobe grows on 1,000,000 vectors" src="docs/img/qps_vs_nprobe_1m_light.png">
 </picture>
 
-The green dashed line is a reference. It shows Faiss with all queries sent in one batch on all cores. It is not a like-for-like row.
+Solid lines send one query per call on one thread. Dashed lines send all queries in one batch and use every core. Compare solid with solid, dashed with dashed.
 
 ### Writes
 
@@ -67,7 +86,7 @@ Vectors can be added after training. The next chart shows how fast.
   <img alt="Insert throughput by batch size on 1,000,000 vectors" src="docs/img/write_throughput_1m_light.png">
 </picture>
 
-Adding one vector at a time is slow here. Each call has fixed Python overhead. Each call also copies a list. Bigger batches spread that cost. One run was made for each batch size.
+Each add call finds the nearest centroid of every new vector. That is the main cost. Bigger batches spread the fixed per-call cost. Dashed lines let the index use every core. One run was made for each batch size.
 
 ### Build
 
@@ -75,6 +94,8 @@ Adding one vector at a time is slow here. Each call has fixed Python overhead. E
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/build_time_1m_dark.png">
   <img alt="Time to train and fill the index on 1,000,000 vectors" src="docs/img/build_time_1m_light.png">
 </picture>
+
+Training is where the Go engine is slowest. K-means is one huge matrix product, repeated. Faiss hands that product to a tuned matrix library. The Go engine computes it with its own vector loops, one point at a time.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/kmeans_loss_1m_dark.png">
@@ -88,54 +109,80 @@ Adding one vector at a time is slow here. Each call has fixed Python overhead. E
 
 Reads
 
-| nprobe | recall@10 vecstore | recall@10 faiss | queries/s vecstore | queries/s faiss | faiss speed over vecstore |
-|---|---|---|---|---|---|
-| 1 | 0.2881 | 0.2885 | 23,998 | 27,874 | 1.2x |
-| 4 | 0.5777 | 0.5798 | 10,795 | 17,456 | 1.6x |
-| 16 | 0.8453 | 0.8462 | 6,155 | 11,454 | 1.9x |
-| 64 | 0.9750 | 0.9742 | 2,127 | 4,166 | 2.0x |
+Recall@10
 
-Writes after the index is built
-
-| vectors per add call | vecstore vectors/s | faiss vectors/s |
+| nprobe | Go | faiss |
 |---|---|---|
-| 1 | 1,542 | 32,234 |
-| 100 | 51,513 | 36,301 |
-| 1,000 | 88,319 | 306,600 |
-| 10,000 | 160,166 | 315,314 |
+| 1 | 0.2915 | 0.2885 |
+| 4 | 0.5807 | 0.5798 |
+| 16 | 0.8447 | 0.8464 |
+| 64 | 0.9749 | 0.9748 |
 
-Build
+Queries per second. One query per call, one thread, unless marked batched.
+
+| nprobe | Go | faiss | Go batched, all cores | faiss batched, all cores | faiss speed over Go |
+|---|---|---|---|---|---|
+| 1 | 24,206 | 26,940 | 176,594 | 128,381 | 1.11x |
+| 4 | 17,216 | 20,992 | 120,140 | 109,612 | 1.22x |
+| 16 | 10,702 | 11,658 | 74,083 | 67,389 | 1.09x |
+| 64 | 3,022 | 4,336 | 16,513 | 21,953 | 1.43x |
+
+A faiss-over-Go value below 1.00x means the Go engine is faster.
+
+Writes after the index is built. Vectors per second. One thread unless marked all cores.
+
+| vectors per add call | Go | faiss | Go, all cores | faiss, all cores |
+|---|---|---|---|---|
+| 1 | 15,873 | 20,546 | n/a | 7,019 |
+| 100 | 21,382 | 25,907 | 166,765 | 140,774 |
+| 1,000 | 24,485 | 223,282 | 195,650 | 287,000 |
+| 10,000 | 27,070 | 229,810 | 195,209 | 303,646 |
+
+Build. Every index trains for the same number of k-means iterations.
 
 | index | train (s) | add all vectors (s) |
 |---|---|---|
-| vecstore | 76.5 | 3.6 |
-| faiss | 67.3 | 3.6 |
+| Go | 120.4 | 6.6 |
+| faiss | 63.0 | 3.3 |
 
 #### 200,000 vectors, nlist 1024
 
 Reads
 
-| nprobe | recall@10 vecstore | recall@10 faiss | queries/s vecstore | queries/s faiss | faiss speed over vecstore |
-|---|---|---|---|---|---|
-| 1 | 0.3367 | 0.3336 | 32,173 | 73,689 | 2.3x |
-| 4 | 0.6544 | 0.6517 | 16,915 | 36,236 | 2.1x |
-| 16 | 0.9071 | 0.9067 | 8,067 | 19,273 | 2.4x |
-| 64 | 0.9930 | 0.9931 | 2,637 | 5,014 | 1.9x |
+Recall@10
 
-Writes after the index is built
-
-| vectors per add call | vecstore vectors/s | faiss vectors/s |
+| nprobe | Go | faiss |
 |---|---|---|
-| 1 | 4,649 | 89,756 |
-| 100 | 88,259 | 119,617 |
-| 1,000 | 142,491 | 884,819 |
-| 10,000 | 414,907 | 902,969 |
+| 1 | 0.3349 | 0.3336 |
+| 4 | 0.6547 | 0.6517 |
+| 16 | 0.9063 | 0.9067 |
+| 64 | 0.9935 | 0.9931 |
 
-Build
+Queries per second. One query per call, one thread, unless marked batched.
+
+| nprobe | Go | faiss | Go batched, all cores | faiss batched, all cores | faiss speed over Go |
+|---|---|---|---|---|---|
+| 1 | 69,723 | 69,203 | 550,600 | 144,974 | 0.99x |
+| 4 | 48,656 | 45,237 | 378,675 | 139,919 | 0.93x |
+| 16 | 18,463 | 20,106 | 125,246 | 110,202 | 1.09x |
+| 64 | 4,943 | 6,167 | 23,355 | 22,060 | 1.25x |
+
+A faiss-over-Go value below 1.00x means the Go engine is faster.
+
+Writes after the index is built. Vectors per second. One thread unless marked all cores.
+
+| vectors per add call | Go | faiss | Go, all cores | faiss, all cores |
+|---|---|---|---|---|
+| 1 | 57,069 | 66,466 | n/a | 7,005 |
+| 100 | 69,310 | 82,982 | 311,053 | 259,000 |
+| 1,000 | 70,094 | 614,842 | 536,615 | 867,761 |
+| 10,000 | 75,218 | 575,053 | 749,733 | 965,795 |
+
+Build. Every index trains for the same number of k-means iterations.
 
 | index | train (s) | add all vectors (s) |
 |---|---|---|
-| vecstore | 6.2 | 0.2 |
+| Go | 6.1 | 0.4 |
 | faiss | 3.2 | 0.2 |
 
 <!-- results:end -->
@@ -165,86 +212,114 @@ Build
 
 </details>
 
+## How the Go engine works
+
+The engine is in `engine/`. It has no dependencies outside the standard library.
+
+- `distance.go` has the one squared-L2 function every index uses.
+- `topk.go` has a bounded heap that keeps the best k results. Ties go to the smaller id.
+- `flat.go` is the exact brute-force index and the oracle for the tests.
+- `centroids.go` and `kmeans.go` train the regions. Results are the same for any worker count.
+- `ivf.go` is the index. Many goroutines can search at once.
+- `simd_arm64.s` holds the assembly kernels.
+
+### Why there is assembly
+
+A first Go version ran slower than expected. A profile showed the distance loop handling about one number per cycle. The Go compiler does not use vector instructions by itself.
+
+Apple chips have NEON, which works on four numbers per instruction. Three kernels are written by hand: one distance, four distances at once, and a dot product against four centroids.
+
+Each kernel has a plain Go twin. Tests compare the two on many lengths. The four-at-once kernel must give the same bits as the one-at-a-time kernel. That keeps exact comparisons with the brute-force index valid.
+
+Search also splits work across cores in small chunks handed out on demand. Equal slices left the fast cores waiting for the slow ones.
+
+On other CPUs the plain Go loops run. The build tag `purego` forces them.
+
 ## How it was checked
 
-The brute-force index in `vecstore/flat.py` is the oracle. It is compared with a plain Python loop.
+The brute-force index is the oracle. The IVF index is tested against it. These checks run for the Go engine:
 
-The IVF index is tested against the oracle. These checks run in `tests/`:
-
-- With `nprobe` equal to `nlist`, the results equal brute force exactly.
+- With `nprobe` equal to `nlist`, ids and distances equal brute force exactly.
 - A stored vector searched alone returns itself first.
-- Vectors added after training are found.
+- Vectors added after training are found, in one call or several.
 - Recall rises as `nprobe` rises.
-- The k-means loss falls on every iteration of a synthetic set.
-- Empty lists, custom ids and use before training behave as expected.
+- The k-means loss falls on every iteration.
+- The worker count never changes a result.
+- Each assembly kernel matches its plain Go twin.
+- Many goroutines searching at once get the same answers.
 
-```
-$ make test
-============================= test session starts ==============================
-platform darwin -- Python 3.13.17, pytest-9.2.0, pluggy-1.7.0
-collected 17 items
-tests/test_flat.py ......                                                [ 35%]
-tests/test_ivf.py .......                                                [ 76%]
-tests/test_kmeans.py ....                                                [100%]
-============================== 17 passed in 0.20s ==============================
-```
+Go tests run with the race detector. CI runs them on Linux (amd64) and on macOS (arm64), and again with assembly switched off.
 
-The ground truth for the benchmark comes from the oracle. It was cross-checked against `faiss.IndexFlatL2` on 1,000 queries. The two differ only where two vectors sit at the exact same distance. Both answers are right in those cases.
+CI caught a real bug while this was being built. The assembly did not build on Go 1.23 because it used instruction names that older assemblers lack. It is fixed, and the build is now tested on that version.
+
+The ground truth for the benchmark comes from `faiss.IndexFlatL2`. The Go exact index is checked against it on 500 queries. They differ only where two vectors sit at the exact same distance. Both answers are right in those cases.
 
 ## Fair comparison
 
 - Both indexes train on the same vectors.
 - Both use the same `nlist` and 20 k-means iterations.
-- Query speed is measured one query per call. It is the median of three passes over 10,000 queries.
-- Faiss is held to one thread for that measurement.
-- Insert speed is one run per batch size. Faiss is also held to one thread.
+- Query speed is one query per call. Faiss is held to one thread. The Go engine uses one goroutine.
+- Each speed is the fastest of seven passes over 10,000 queries. Other programs can only slow a pass down.
+- Insert speed is one run per batch size.
 - Build time uses default threads for both.
-- NumPy's own BLAS threads are not pinned.
+- Go's garbage collector can use other cores.
 
-Recall is close but not identical. The two k-means runs start from different points. The lists differ a little.
+Recall is close but not identical. The k-means runs start from different points. The lists differ a little.
+
+The benchmark machine was a normal desktop with other programs open. An earlier run of the same code gave speeds that differed by up to a factor of two between runs. That is why the fastest of seven passes is reported. Treat differences of about 10 percent as noise.
 
 ## Limits
 
-- Python is slower than C++. Faiss wins on speed in nearly every row.
-- Search loops over queries in Python. A query batch gets no speed-up.
-- Memory use is not tuned. Vectors are stored as float32 with no compression.
-- Results come from one machine, an Apple M4 Pro. Numbers will differ elsewhere.
+- The assembly was tested on one chip, an Apple M4 Pro. Other arm64 chips are untested.
+- The portable path is tested in CI on Linux amd64. It was not benchmarked there.
+- Training is slower than in Faiss.
+- Faiss is faster for large insert batches.
+- Only squared L2 distance and float32 vectors are supported.
+- No deletion and no saving to disk.
+- `Add` and `Train` must not run at the same time as a search.
+- Results come from one machine. Numbers will differ elsewhere.
 - No claim is made of a new idea. No claim is made of beating Faiss.
 
 ## Layout
 
 ```
-vecstore/
-  flat.py      brute-force search and the shared top-k helper
-  kmeans.py    Lloyd's k-means with fixed seeds
-  ivf.py       IVF-Flat: train, add, search
-tests/         correctness tests
+engine/            the Go engine (module github.com/sptsway/vcdb/engine)
+  flat.go          brute-force index
+  topk.go          bounded heap
+  kmeans.go        Lloyd's k-means
+  ivf.go           IVF-Flat index
+  simd_arm64.s     NEON kernels
+  cmd/vcbench/     benchmark binary
 bench/
-  fetch.py     downloads the dataset after checking its size
-  compare.py   benchmark against faiss.IndexIVFFlat
-  plot.py      draws the charts from results/
-results/       CSV files. The only source of numbers
-docs/          walkthrough and chart images
-tools/         builds OVERVIEW.md and the tables above
+  fetch.py         downloads the dataset after checking its size
+  export_data.py   writes vectors and true neighbours as raw files
+  groundtruth.py   exact neighbours from faiss.IndexFlatL2
+  compare.py       Faiss benchmark
+  plot.py          draws the charts from results/
+results/           CSV files. The only source of numbers
+docs/              walkthrough and chart images
+tools/             builds OVERVIEW.md and the tables above
 ```
 
 ## Run it
 
-Tested on macOS with Python 3.13. Other platforms were not tried.
+Needs Go 1.23 or newer. The Python harness needs Python 3.13. Tested on macOS only.
 
 ```
-make setup     # create .venv and install packages
-make test      # run the tests
-make fetch     # download the dataset (about 525 MB)
-make bench     # 200,000 vector benchmark
-make plots     # redraw the charts
-make status    # rebuild OVERVIEW.md and the tables above
+make test       # Go tests with the race detector
+make setup      # create .venv and install the benchmark packages
+make fetch      # download the dataset (about 525 MB)
+make bench-all  # 200,000 vectors: Faiss, then Go
+make plots      # redraw the charts
+make status     # rebuild OVERVIEW.md and the tables above
 ```
 
 The 1,000,000 vector run:
 
 ```
 .venv/bin/python bench/compare.py --n 1000000 --nlist 4096
+.venv/bin/python bench/export_data.py --n 1000000
+cd engine && go run ./cmd/vcbench -dir ../data/export/1m -tag 1m -nlist 4096 -out ../results
 ```
 
 ## Read more
@@ -255,7 +330,7 @@ The 1,000,000 vector run:
 
 ## Status
 
-Planned and not built: a mini-batch k-means trainer and a note on HNSW. Both are optional.
+Planned and not built: a mini-batch k-means trainer, a note on HNSW, and a tiled kernel to speed up training. All are optional.
 
 ## Licence
 
