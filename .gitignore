@@ -7,7 +7,7 @@ __pycache__/
 # Large downloaded datasets (fetched by `make fetch`)
 data/
 
-# Agent prompts and tooling stay local
+# Local working files stay out of the repository
 *prompt*.md
 .claude/
 CLAUDE.md
