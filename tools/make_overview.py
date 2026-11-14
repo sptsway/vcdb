@@ -13,15 +13,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VALID = {"planned", "in progress", "done"}
 
-# (heading, csv path). Add a row here when a new benchmark appears.
-RESULTS = [
-    ("Recall and queries per second, 200k vectors", "results/recall_qps_200k.csv"),
-    ("Build and write throughput, 200k vectors", "results/build_200k.csv"),
-    ("Insert throughput by batch size, 200k vectors", "results/write_qps_200k.csv"),
-    ("Recall and queries per second, 1M vectors", "results/recall_qps_1m.csv"),
-    ("Build and write throughput, 1M vectors", "results/build_1m.csv"),
-    ("Insert throughput by batch size, 1M vectors", "results/write_qps_1m.csv"),
-    ("Run environment", "results/run_info.csv"),
+# (heading, csv path). Python and Faiss results first, then the Go engine's.
+RESULTS = []
+for _tag, _size in (("200k", "200k vectors"), ("1m", "1M vectors")):
+    for _prefix, _who in (("", "Python and Faiss"), ("go_", "Go engine")):
+        RESULTS += [
+            (f"Recall and queries per second, {_size}, {_who}", f"results/{_prefix}recall_qps_{_tag}.csv"),
+            (f"Build time, {_size}, {_who}", f"results/{_prefix}build_{_tag}.csv"),
+            (f"Insert throughput by batch size, {_size}, {_who}", f"results/{_prefix}write_qps_{_tag}.csv"),
+        ]
+RESULTS += [
+    ("Run environment, Python and Faiss", "results/run_info.csv"),
+    ("Run environment, Go engine", "results/go_run_info.csv"),
 ]
 
 
@@ -69,10 +72,14 @@ def load(name):
         return list(csv.DictReader(f))
 
 
+def load_all(stem, tag):
+    """Python/Faiss rows and Go rows for one run, joined."""
+    return (load(f"{stem}_{tag}.csv") or []) + (load(f"go_{stem}_{tag}.csv") or [])
+
+
 def tags():
     """Result sets present on disk, smallest first: ['200k', '1m']."""
-    found = [t for t in ("200k", "1m") if load(f"recall_qps_{t}.csv")]
-    return found
+    return [t for t in ("200k", "1m") if load(f"recall_qps_{t}.csv")]
 
 
 def title_for(tag):
@@ -80,36 +87,76 @@ def title_for(tag):
     return f"{int(row['n']):,} vectors, nlist {row['nlist']}"
 
 
+# CSV key -> short name in the tables. Order is the column order.
+NAMES = {"vecstore_go": "Go", "vecstore": "Python", "faiss": "faiss"}
+SINGLE = list(NAMES)
+
+
+def present(rows):
+    return [k for k in SINGLE if any(r["impl"] == k for r in rows)]
+
+
+def value(rows, impl, col, **where):
+    for r in rows:
+        if r["impl"] == impl and all(r[c] == v for c, v in where.items()):
+            return float(r[col])
+    return None
+
+
 def speed_table(tag):
-    rows = load(f"recall_qps_{tag}.csv")
-    get = lambda impl, nprobe, col: next(
-        float(r[col]) for r in rows if r["impl"] == impl and r["nprobe"] == nprobe
-    )
-    out = ["| nprobe | recall@10 vecstore | recall@10 faiss | queries/s vecstore "
-           "| queries/s faiss | faiss speed over vecstore |", "|---|---|---|---|---|---|"]
-    for nprobe in sorted({r["nprobe"] for r in rows}, key=int):
-        qv, qf = get("vecstore", nprobe, "qps"), get("faiss", nprobe, "qps")
-        out.append(f"| {nprobe} | {get('vecstore', nprobe, 'recall_at_10'):.4f} "
-                   f"| {get('faiss', nprobe, 'recall_at_10'):.4f} | {qv:,.0f} | {qf:,.0f} "
-                   f"| {qf / qv:.1f}x |")
+    rows = load_all("recall_qps", tag)
+    impls = present(rows)
+    nprobes = sorted({r["nprobe"] for r in rows}, key=int)
+    out = ["Recall@10", "",
+           "| nprobe | " + " | ".join(NAMES[k] for k in impls) + " |",
+           "|---|" + "---|" * len(impls)]
+    for n in nprobes:
+        out.append(f"| {n} | " + " | ".join(
+            f"{value(rows, k, 'recall_at_10', nprobe=n):.4f}" for k in impls) + " |")
+
+    cols = impls + [k for k in ("vecstore_go_batch", "faiss_batch") if any(r["impl"] == k for r in rows)]
+    label = {**NAMES, "vecstore_go_batch": "Go batched, all cores", "faiss_batch": "faiss batched, all cores"}
+    head = [label[k] for k in cols]
+    extra = []
+    if "vecstore_go" in impls and "faiss" in impls:
+        extra.append("faiss speed over Go")
+    if "vecstore_go" in impls and "vecstore" in impls:
+        extra.append("Go speed over Python")
+    out += ["", "Queries per second. One query per call, one thread, unless marked batched.", "",
+            "| nprobe | " + " | ".join(head + extra) + " |", "|---|" + "---|" * (len(head) + len(extra))]
+    for n in nprobes:
+        cells = [f"{value(rows, k, 'qps', nprobe=n):,.0f}" for k in cols]
+        go, fa, py = (value(rows, k, "qps", nprobe=n) for k in ("vecstore_go", "faiss", "vecstore"))
+        if "faiss speed over Go" in extra:
+            cells.append(f"{fa / go:.2f}x")
+        if "Go speed over Python" in extra:
+            cells.append(f"{go / py:.2f}x")
+        out.append(f"| {n} | " + " | ".join(cells) + " |")
+    if "faiss speed over Go" in extra:
+        out += ["", "A faiss-over-Go value below 1.00x means the Go engine is faster."]
     return "\n".join(out)
 
 
 def write_table(tag):
-    rows = load(f"write_qps_{tag}.csv")
-    out = ["| vectors per add call | vecstore vectors/s | faiss vectors/s |", "|---|---|---|"]
+    rows = load_all("write_qps", tag)
+    cols = present(rows) + [k for k in ("vecstore_go_batch", "faiss_batch") if any(r["impl"] == k for r in rows)]
+    label = {**NAMES, "vecstore_go_batch": "Go, all cores", "faiss_batch": "faiss, all cores"}
+    out = ["| vectors per add call | " + " | ".join(label[k] for k in cols) + " |",
+           "|---|" + "---|" * len(cols)]
     for b in sorted({r["batch_size"] for r in rows}, key=int):
-        v = next(float(r["vectors_per_s"]) for r in rows if r["impl"] == "vecstore" and r["batch_size"] == b)
-        f = next(float(r["vectors_per_s"]) for r in rows if r["impl"] == "faiss" and r["batch_size"] == b)
-        out.append(f"| {int(b):,} | {v:,.0f} | {f:,.0f} |")
+        cells = []
+        for k in cols:
+            v = value(rows, k, "vectors_per_s", batch_size=b)
+            cells.append(f"{v:,.0f}" if v is not None else "n/a")
+        out.append(f"| {int(b):,} | " + " | ".join(cells) + " |")
     return "\n".join(out)
 
 
 def build_table(tag):
-    rows = load(f"build_{tag}.csv")
+    rows = load_all("build", tag)
     out = ["| index | train (s) | add all vectors (s) |", "|---|---|---|"]
-    for r in rows:
-        out.append(f"| {r['impl']} | {float(r['train_s']):.1f} | {float(r['add_s']):.1f} |")
+    for k in present(rows):
+        out.append(f"| {NAMES[k]} | {value(rows, k, 'train_s'):.1f} | {value(rows, k, 'add_s'):.1f} |")
     return "\n".join(out)
 
 
@@ -117,8 +164,9 @@ def results_for_readme():
     out = []
     for tag in reversed(tags()):  # largest first
         out += [f"#### {title_for(tag)}", "", "Reads", "", speed_table(tag), "",
-                "Writes after the index is built", "", write_table(tag), "",
-                "Build", "", build_table(tag), ""]
+                "Writes after the index is built. Vectors per second. One thread unless marked all cores.", "", write_table(tag), "",
+                "Build. Every index trains for the same number of k-means iterations.", "",
+                build_table(tag), ""]
     return "\n".join(out) if out else "no result yet"
 
 
@@ -126,19 +174,23 @@ def headline():
     """A few sentences computed from the CSVs."""
     lines = []
     for tag in reversed(tags()):
-        rows = load(f"recall_qps_{tag}.csv")
+        rows = load_all("recall_qps", tag)
+        main = "vecstore_go" if any(r["impl"] == "vecstore_go" for r in rows) else "vecstore"
         by = lambda impl: {r["nprobe"]: r for r in rows if r["impl"] == impl}
-        v, f = by("vecstore"), by("faiss")
-        gap = max(abs(float(v[k]["recall_at_10"]) - float(f[k]["recall_at_10"])) for k in v)
-        ratios = [float(f[k]["qps"]) / float(v[k]["qps"]) for k in v]
-        top = max(v, key=int)
-        info = next(r for r in load("run_info.csv") if r["run"] == tag)
-        lines.append(
-            f"- **{title_for(tag)}.** Recall@10 reaches {float(v[top]['recall_at_10']):.3f} "
-            f"at nprobe {top}. It never differs from faiss by more than {gap:.4f}. "
-            f"Faiss on one thread is {min(ratios):.1f}x to {max(ratios):.1f}x faster per query. "
-            f"Peak memory was {int(info['peak_rss_mb']):,} MB."
-        )
+        m, f, py = by(main), by("faiss"), by("vecstore")
+        top = max(m, key=int)
+        gap = max(abs(float(m[k]["recall_at_10"]) - float(f[k]["recall_at_10"])) for k in m)
+        share = [float(m[k]["qps"]) / float(f[k]["qps"]) for k in m]
+        who = "The Go engine" if main == "vecstore_go" else "vecstore"
+        text = (f"- **{title_for(tag)}.** {who} reaches recall@10 of {float(m[top]['recall_at_10']):.3f} "
+                f"at nprobe {top}. It never differs from faiss by more than {gap:.4f}. "
+                f"On one thread it runs at {min(share):.0%} to {max(share):.0%} of faiss's query speed")
+        if main == "vecstore_go" and py:
+            up = [float(m[k]["qps"]) / float(py[k]["qps"]) for k in m]
+            text += f" and at {min(up):.1f}x to {max(up):.1f}x the Python reference"
+        info = next((r for r in (load("go_run_info.csv") or []) if r["run"] == tag), None)
+        info = info or next(r for r in load("run_info.csv") if r["run"] == tag)
+        lines.append(text + f". Peak memory was {int(float(info['peak_rss_mb'])):,} MB.")
     return "\n".join(lines) if lines else "no result yet"
 
 

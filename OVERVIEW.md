@@ -17,12 +17,12 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 | Go engine: Lloyd's k-means | done | `engine/kmeans.go` |
 | Go engine: IVF-Flat index | done | `engine/ivf.go` |
 | Go engine: NEON kernels for arm64 (portable fallback) | done | `engine/simd_arm64.s` |
-| Go engine: benchmark binary | planned | `engine/cmd/vcbench/main.go` |
+| Go engine: benchmark binary | done | `engine/cmd/vcbench/main.go` |
 | Python reference: brute-force search | done | `vecstore/flat.py` |
 | Python reference: Lloyd's k-means | done | `vecstore/kmeans.py` |
 | Python reference: IVF-Flat index | done | `vecstore/ivf.py` |
 | Python reference: tests | done | `tests/test_ivf.py` |
-| Benchmark harness against Faiss (Python) | done | `bench/compare.py` |
+| Benchmark harness: Faiss and data export (Python) | done | `bench/compare.py` |
 | Benchmark charts (Python) | done | `bench/plot.py` |
 | Plain-English walkthrough | done | `docs/walkthrough.md` |
 | Mini-batch k-means trainer (optional) | planned |  |
@@ -32,83 +32,160 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 
 Every number below is read from a CSV in `results/`.
 
-### Recall and queries per second, 200k vectors
+### Recall and queries per second, 200k vectors, Python and Faiss
 
 | impl | n | nlist | nprobe | recall_at_10 | qps |
 |---|---|---|---|---|---|
-| vecstore | 200000 | 1024 | 1 | 0.3367 | 32173 |
-| faiss | 200000 | 1024 | 1 | 0.3336 | 73689 |
-| faiss_batch | 200000 | 1024 | 1 | 0.3336 | 140056 |
-| vecstore | 200000 | 1024 | 4 | 0.6544 | 16915 |
-| faiss | 200000 | 1024 | 4 | 0.6517 | 36236 |
-| faiss_batch | 200000 | 1024 | 4 | 0.6517 | 127375 |
-| vecstore | 200000 | 1024 | 16 | 0.9071 | 8067 |
-| faiss | 200000 | 1024 | 16 | 0.9067 | 19273 |
-| faiss_batch | 200000 | 1024 | 16 | 0.9067 | 59886 |
-| vecstore | 200000 | 1024 | 64 | 0.9930 | 2637 |
-| faiss | 200000 | 1024 | 64 | 0.9931 | 5014 |
-| faiss_batch | 200000 | 1024 | 64 | 0.9931 | 31513 |
+| vecstore | 200000 | 1024 | 1 | 0.3367 | 34636 |
+| faiss | 200000 | 1024 | 1 | 0.3336 | 76235 |
+| faiss_batch | 200000 | 1024 | 1 | 0.3336 | 155186 |
+| vecstore | 200000 | 1024 | 4 | 0.6544 | 19263 |
+| faiss | 200000 | 1024 | 4 | 0.6517 | 50477 |
+| faiss_batch | 200000 | 1024 | 4 | 0.6517 | 137585 |
+| vecstore | 200000 | 1024 | 16 | 0.9071 | 8971 |
+| faiss | 200000 | 1024 | 16 | 0.9067 | 19985 |
+| faiss_batch | 200000 | 1024 | 16 | 0.9067 | 124771 |
+| vecstore | 200000 | 1024 | 64 | 0.9930 | 2879 |
+| faiss | 200000 | 1024 | 64 | 0.9931 | 5479 |
+| faiss_batch | 200000 | 1024 | 64 | 0.9931 | 28489 |
 
-### Build and write throughput, 200k vectors
+### Build time, 200k vectors, Python and Faiss
 
 | impl | n | nlist | train_s | add_s | add_vectors_per_s |
 |---|---|---|---|---|---|
-| vecstore | 200000 | 1024 | 6.17 | 0.20 | 1001757 |
-| faiss | 200000 | 1024 | 3.16 | 0.18 | 1090719 |
+| vecstore | 200000 | 1024 | 6.44 | 0.23 | 851901 |
+| faiss | 200000 | 1024 | 3.13 | 0.16 | 1225362 |
 
-### Insert throughput by batch size, 200k vectors
+### Insert throughput by batch size, 200k vectors, Python and Faiss
 
 | impl | batch_size | vectors | vectors_per_s |
 |---|---|---|---|
-| vecstore | 1 | 5000 | 4649 |
-| faiss | 1 | 5000 | 89756 |
-| vecstore | 100 | 5000 | 88259 |
-| faiss | 100 | 5000 | 119617 |
-| vecstore | 1000 | 5000 | 142491 |
-| faiss | 1000 | 5000 | 884819 |
-| vecstore | 10000 | 10000 | 414907 |
-| faiss | 10000 | 10000 | 902969 |
+| vecstore | 1 | 5000 | 3648 |
+| faiss | 1 | 5000 | 91253 |
+| vecstore | 100 | 5000 | 90717 |
+| faiss | 100 | 5000 | 117920 |
+| vecstore | 1000 | 5000 | 136972 |
+| faiss | 1000 | 5000 | 903771 |
+| vecstore | 10000 | 10000 | 391119 |
+| faiss | 10000 | 10000 | 901496 |
+| faiss_batch | 1 | 5000 | 9021 |
+| faiss_batch | 100 | 5000 | 307613 |
+| faiss_batch | 1000 | 5000 | 1040123 |
+| faiss_batch | 10000 | 10000 | 1149921 |
 
-### Recall and queries per second, 1M vectors
+### Recall and queries per second, 200k vectors, Go engine
 
 | impl | n | nlist | nprobe | recall_at_10 | qps |
 |---|---|---|---|---|---|
-| vecstore | 1000000 | 4096 | 1 | 0.2881 | 23998 |
-| faiss | 1000000 | 4096 | 1 | 0.2885 | 27874 |
-| faiss_batch | 1000000 | 4096 | 1 | 0.2885 | 105759 |
-| vecstore | 1000000 | 4096 | 4 | 0.5777 | 10795 |
-| faiss | 1000000 | 4096 | 4 | 0.5798 | 17456 |
-| faiss_batch | 1000000 | 4096 | 4 | 0.5798 | 90941 |
-| vecstore | 1000000 | 4096 | 16 | 0.8453 | 6155 |
-| faiss | 1000000 | 4096 | 16 | 0.8462 | 11454 |
-| faiss_batch | 1000000 | 4096 | 16 | 0.8462 | 44453 |
-| vecstore | 1000000 | 4096 | 64 | 0.9750 | 2127 |
-| faiss | 1000000 | 4096 | 64 | 0.9742 | 4166 |
-| faiss_batch | 1000000 | 4096 | 64 | 0.9742 | 20774 |
+| vecstore_go | 200000 | 1024 | 1 | 0.3349 | 68516 |
+| vecstore_go_batch | 200000 | 1024 | 1 | 0.3349 | 640406 |
+| vecstore_go | 200000 | 1024 | 4 | 0.6546 | 42772 |
+| vecstore_go_batch | 200000 | 1024 | 4 | 0.6546 | 367493 |
+| vecstore_go | 200000 | 1024 | 16 | 0.9063 | 17974 |
+| vecstore_go_batch | 200000 | 1024 | 16 | 0.9063 | 99935 |
+| vecstore_go | 200000 | 1024 | 64 | 0.9934 | 5311 |
+| vecstore_go_batch | 200000 | 1024 | 64 | 0.9934 | 37850 |
 
-### Build and write throughput, 1M vectors
+### Build time, 200k vectors, Go engine
 
 | impl | n | nlist | train_s | add_s | add_vectors_per_s |
 |---|---|---|---|---|---|
-| vecstore | 1000000 | 4096 | 76.50 | 3.57 | 279854 |
-| faiss | 1000000 | 4096 | 67.33 | 3.62 | 276226 |
+| vecstore_go | 200000 | 1024 | 9.90 | 0.57 | 349926 |
 
-### Insert throughput by batch size, 1M vectors
+### Insert throughput by batch size, 200k vectors, Go engine
 
 | impl | batch_size | vectors | vectors_per_s |
 |---|---|---|---|
-| vecstore | 1 | 5000 | 1542 |
-| faiss | 1 | 5000 | 32234 |
-| vecstore | 100 | 5000 | 51513 |
-| faiss | 100 | 5000 | 36301 |
-| vecstore | 1000 | 5000 | 88319 |
-| faiss | 1000 | 5000 | 306600 |
-| vecstore | 10000 | 10000 | 160166 |
-| faiss | 10000 | 10000 | 315314 |
+| vecstore_go | 1 | 5000 | 53674 |
+| vecstore_go | 100 | 5000 | 54862 |
+| vecstore_go | 1000 | 5000 | 54368 |
+| vecstore_go | 10000 | 10000 | 54426 |
+| vecstore_go_batch | 100 | 5000 | 200996 |
+| vecstore_go_batch | 1000 | 5000 | 250733 |
+| vecstore_go_batch | 10000 | 10000 | 419405 |
 
-### Run environment
+### Recall and queries per second, 1M vectors, Python and Faiss
+
+| impl | n | nlist | nprobe | recall_at_10 | qps |
+|---|---|---|---|---|---|
+| vecstore | 1000000 | 4096 | 1 | 0.2881 | 26835 |
+| faiss | 1000000 | 4096 | 1 | 0.2885 | 29267 |
+| faiss_batch | 1000000 | 4096 | 1 | 0.2885 | 115380 |
+| vecstore | 1000000 | 4096 | 4 | 0.5777 | 12157 |
+| faiss | 1000000 | 4096 | 4 | 0.5798 | 23014 |
+| faiss_batch | 1000000 | 4096 | 4 | 0.5798 | 120456 |
+| vecstore | 1000000 | 4096 | 16 | 0.8453 | 6456 |
+| faiss | 1000000 | 4096 | 16 | 0.8462 | 12250 |
+| faiss_batch | 1000000 | 4096 | 16 | 0.8462 | 74271 |
+| vecstore | 1000000 | 4096 | 64 | 0.9750 | 2196 |
+| faiss | 1000000 | 4096 | 64 | 0.9742 | 4532 |
+| faiss_batch | 1000000 | 4096 | 64 | 0.9742 | 23268 |
+
+### Build time, 1M vectors, Python and Faiss
+
+| impl | n | nlist | train_s | add_s | add_vectors_per_s |
+|---|---|---|---|---|---|
+| vecstore | 1000000 | 4096 | 78.08 | 3.63 | 275329 |
+| faiss | 1000000 | 4096 | 64.14 | 3.35 | 298584 |
+
+### Insert throughput by batch size, 1M vectors, Python and Faiss
+
+| impl | batch_size | vectors | vectors_per_s |
+|---|---|---|---|
+| vecstore | 1 | 5000 | 1469 |
+| faiss | 1 | 5000 | 33795 |
+| vecstore | 100 | 5000 | 38434 |
+| faiss | 100 | 5000 | 35742 |
+| vecstore | 1000 | 5000 | 54297 |
+| faiss | 1000 | 5000 | 289790 |
+| vecstore | 10000 | 10000 | 64021 |
+| faiss | 10000 | 10000 | 293330 |
+| faiss_batch | 1 | 5000 | 7928 |
+| faiss_batch | 100 | 5000 | 130198 |
+| faiss_batch | 1000 | 5000 | 284223 |
+| faiss_batch | 10000 | 10000 | 290260 |
+
+### Recall and queries per second, 1M vectors, Go engine
+
+| impl | n | nlist | nprobe | recall_at_10 | qps |
+|---|---|---|---|---|---|
+| vecstore_go | 1000000 | 4096 | 1 | 0.2915 | 27921 |
+| vecstore_go_batch | 1000000 | 4096 | 1 | 0.2915 | 254221 |
+| vecstore_go | 1000000 | 4096 | 4 | 0.5807 | 20238 |
+| vecstore_go_batch | 1000000 | 4096 | 4 | 0.5807 | 142278 |
+| vecstore_go | 1000000 | 4096 | 16 | 0.8444 | 11065 |
+| vecstore_go_batch | 1000000 | 4096 | 16 | 0.8444 | 82405 |
+| vecstore_go | 1000000 | 4096 | 64 | 0.9743 | 3954 |
+| vecstore_go_batch | 1000000 | 4096 | 64 | 0.9743 | 16053 |
+
+### Build time, 1M vectors, Go engine
+
+| impl | n | nlist | train_s | add_s | add_vectors_per_s |
+|---|---|---|---|---|---|
+| vecstore_go | 1000000 | 4096 | 174.45 | 9.40 | 106330 |
+
+### Insert throughput by batch size, 1M vectors, Go engine
+
+| impl | batch_size | vectors | vectors_per_s |
+|---|---|---|---|
+| vecstore_go | 1 | 5000 | 12868 |
+| vecstore_go | 100 | 5000 | 15801 |
+| vecstore_go | 1000 | 5000 | 20383 |
+| vecstore_go | 10000 | 10000 | 24001 |
+| vecstore_go_batch | 100 | 5000 | 139323 |
+| vecstore_go_batch | 1000 | 5000 | 181505 |
+| vecstore_go_batch | 10000 | 10000 | 215742 |
+
+### Run environment, Python and Faiss
 
 | run | n | nlist | kmeans_iters | queries | python | numpy | faiss | cpu | peak_rss_mb | flat_agreement_with_faiss |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 200k | 200000 | 1024 | 20 | 10000 | 3.13.17 | 2.5.4 | 1.16.0 | Apple M4 Pro | 2340 | 0.9999 |
-| 1m | 1000000 | 4096 | 20 | 10000 | 3.13.17 | 2.5.4 | 1.16.0 | Apple M4 Pro | 2492 | 0.9994 |
+| 200k | 200000 | 1024 | 20 | 10000 | 3.13.17 | 2.5.4 | 1.16.0 | Apple M4 Pro | 1276 | 0.9999 |
+| 1m | 1000000 | 4096 | 20 | 10000 | 3.13.17 | 2.5.4 | 1.16.0 | Apple M4 Pro | 2461 | 0.9994 |
+
+### Run environment, Go engine
+
+| run | n | nlist | kmeans_iters | queries | go | goos_goarch | cores | peak_rss_mb | flat_agreement_with_ground_truth |
+|---|---|---|---|---|---|---|---|---|---|
+| 200k | 200000 | 1024 | 20 | 10000 | go1.27.3 | darwin/arm64 | 12 | 478 | 1.0000 |
+| 1m | 1000000 | 4096 | 20 | 10000 | go1.27.3 | darwin/arm64 | 12 | 1664 | 0.9996 |
