@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # macOS runners are arm64, so this runs the NEON kernels.
+  # Ubuntu runners are amd64, so this runs the portable Go loops on a real CPU.
+  go:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      # The purego tag turns the assembly off, so the portable path is tested on arm64 too.
+      - run: go test -race -count=1 -tags purego ./...
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy pytest
+      - run: pytest -v
