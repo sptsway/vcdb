@@ -1,2 +1,3 @@
 run,n,nlist,kmeans_iters,queries,go,goos_goarch,cores,peak_rss_mb,flat_agreement_with_ground_truth
 200k,200000,1024,20,10000,go1.27.3,darwin/arm64,12,478,1.0000
+1m,1000000,4096,20,10000,go1.27.3,darwin/arm64,12,1664,0.9996
