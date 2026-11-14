@@ -26,8 +26,16 @@ def topk(dist, ids, k):
     if dist.shape[1] > k:
         # argpartition finds the k smallest without sorting everything.
         part = np.argpartition(dist, k - 1, axis=1)[:, :k]
-        dist = np.take_along_axis(dist, part, axis=1)
-        ids = np.take_along_axis(ids, part, axis=1)
+        kept_dist = np.take_along_axis(dist, part, axis=1)
+        kept_ids = np.take_along_axis(ids, part, axis=1)
+        # When several candidates tie with the k-th distance, argpartition keeps
+        # an arbitrary few of them. Redo those rows exactly so that the smaller
+        # ids win. Such rows are rare, so the fast path stays fast.
+        tied = (dist <= kept_dist.max(axis=1, keepdims=True)).sum(axis=1) > k
+        for r in np.nonzero(tied)[0]:
+            best = np.lexsort((ids[r], dist[r]))[:k]
+            kept_dist[r], kept_ids[r] = dist[r][best], ids[r][best]
+        dist, ids = kept_dist, kept_ids
     order = np.lexsort((ids, dist), axis=1)  # sort by distance, then id
     dist = np.take_along_axis(dist, order, axis=1)
     ids = np.take_along_axis(ids, order, axis=1)
