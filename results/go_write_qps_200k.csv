@@ -1,0 +1,8 @@
+impl,batch_size,vectors,vectors_per_s
+vecstore_go,1,5000,53674
+vecstore_go,100,5000,54862
+vecstore_go,1000,5000,54368
+vecstore_go,10000,10000,54426
+vecstore_go_batch,100,5000,200996
+vecstore_go_batch,1000,5000,250733
+vecstore_go_batch,10000,10000,419405

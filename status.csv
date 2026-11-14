@@ -3,12 +3,12 @@ Go engine: brute-force search (correctness oracle),done,engine/flat.go
 Go engine: Lloyd's k-means,done,engine/kmeans.go
 Go engine: IVF-Flat index,done,engine/ivf.go
 Go engine: NEON kernels for arm64 (portable fallback),done,engine/simd_arm64.s
-Go engine: benchmark binary,planned,engine/cmd/vcbench/main.go
+Go engine: benchmark binary,done,engine/cmd/vcbench/main.go
 Python reference: brute-force search,done,vecstore/flat.py
 Python reference: Lloyd's k-means,done,vecstore/kmeans.py
 Python reference: IVF-Flat index,done,vecstore/ivf.py
 Python reference: tests,done,tests/test_ivf.py
-Benchmark harness against Faiss (Python),done,bench/compare.py
+Benchmark harness: Faiss and data export (Python),done,bench/compare.py
 Benchmark charts (Python),done,bench/plot.py
 Plain-English walkthrough,done,docs/walkthrough.md
 Mini-batch k-means trainer (optional),planned,

@@ -6,6 +6,8 @@ Fairness rules:
   * Both indexes train on the same vectors with the same nlist and the
     same number of k-means iterations.
   * Query speed is measured one query per call. Faiss is held to one thread.
+    Each figure is the fastest of several passes. Other programs on the
+    machine can only slow a pass down, never speed it up.
   * Ground truth comes from vecstore's own flat index. It is cross-checked
     against faiss.IndexFlatL2 on a sample of queries.
 """
@@ -13,7 +15,6 @@ import argparse
 import csv
 import platform
 import resource
-import statistics
 import subprocess
 import sys
 import time
@@ -70,8 +71,8 @@ def faiss_agreement(train, queries, truth, sample=1000):
     return recall_at_k(truth[:sample], ids)
 
 
-def time_queries(search_one, queries, repeats=3, warmup=200):
-    """Median queries per second over several passes of one-query calls."""
+def time_queries(search_one, queries, repeats=7, warmup=200):
+    """Best queries per second over several passes of one-query calls."""
     for q in queries[:warmup]:
         search_one(q)
     rates = []
@@ -80,7 +81,7 @@ def time_queries(search_one, queries, repeats=3, warmup=200):
         for q in queries:
             search_one(q)
         rates.append(len(queries) / (time.perf_counter() - t))
-    return statistics.median(rates)
+    return max(rates)
 
 
 def time_adds(add_fn, extra, batch, total):
@@ -168,8 +169,8 @@ def main():
         qps_mine = time_queries(lambda q: mine.search(q, K, nprobe), queries)
         qps_ref = time_queries(lambda q: ref.search(q[None, :], K), queries)
         faiss.omp_set_num_threads(MAX_THREADS)
-        qps_batch = statistics.median(
-            [_timed(lambda: ref.search(queries, K), len(queries)) for _ in range(3)]
+        qps_batch = max(
+            _timed(lambda: ref.search(queries, K), len(queries)) for _ in range(7)
         )
         for name, ids, qps in [
             ("vecstore", i_mine, qps_mine),
@@ -196,6 +197,13 @@ def main():
         rows.append(["faiss", batch, total,
                      f"{time_adds(ref.add, chunk, batch, total):.0f}"])
         print(f"  batch={batch:>5}  vecstore {rows[-2][3]:>8} v/s  faiss {rows[-1][3]:>8} v/s")
+    # The same inserts again with faiss free to use every core.
+    faiss.omp_set_num_threads(MAX_THREADS)
+    for batch in WRITE_BATCHES:
+        total = max(batch, 5000)
+        chunk = np.ascontiguousarray(extra[:total])
+        rows.append(["faiss_batch", batch, total,
+                     f"{time_adds(ref.add, chunk, batch, total):.0f}"])
     write_csv(f"write_qps_{tag}.csv",
               ["impl", "batch_size", "vectors", "vectors_per_s"], rows)
 
