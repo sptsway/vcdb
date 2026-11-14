@@ -3,11 +3,11 @@
 Files go to data/export/<tag>/:
   train.f32    n x 128 float32 vectors to index
   queries.f32  query vectors
-  gt.i32       10 true nearest-neighbour ids per query (from vecstore's flat oracle)
+  gt.i32       10 true nearest-neighbour ids per query (from faiss.IndexFlatL2)
   extra.f32    30,000 vectors used only for the insert benchmark
 
-The Python and Go benchmarks therefore read the same vectors and the same
-ground truth.
+The Faiss and Go benchmarks therefore read the same vectors and the same
+ground truth. vcbench checks its own exact index against gt.i32.
 """
 import argparse
 import sys
@@ -17,10 +17,8 @@ import h5py
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-from vecstore.flat import FlatIndex  # noqa: E402
-
-K = 10
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from groundtruth import K, ground_truth  # noqa: E402
 
 
 def main():
@@ -40,14 +38,7 @@ def main():
     if len(extra) < 30_000:
         extra = full[:30_000]
 
-    cache = ROOT / "data" / f"gt_{tag}.npy"
-    if cache.exists():
-        gt = np.load(cache)
-    else:
-        flat = FlatIndex(train.shape[1])
-        flat.add(train)
-        _, gt = flat.search(queries, K)
-        np.save(cache, gt)
+    gt = ground_truth(train, queries, tag)
 
     out = ROOT / "data" / "export" / tag
     out.mkdir(parents=True, exist_ok=True)

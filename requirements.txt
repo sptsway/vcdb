@@ -1,5 +1,4 @@
 numpy
-pytest
 faiss-cpu
 h5py
 matplotlib
