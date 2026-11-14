@@ -18,7 +18,7 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 | IVF-Flat index | done | `vecstore/ivf.py` |
 | Tests | done | `tests/test_ivf.py` |
 | Benchmark against Faiss | done | `bench/compare.py` |
-| Benchmark charts | planned | `bench/plot.py` |
+| Benchmark charts | done | `bench/plot.py` |
 | Plain-English walkthrough | planned | `docs/walkthrough.md` |
 | Mini-batch k-means trainer (optional) | planned |  |
 | HNSW note (optional) | planned |  |
