@@ -19,7 +19,7 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 | Tests | done | `tests/test_ivf.py` |
 | Benchmark against Faiss | done | `bench/compare.py` |
 | Benchmark charts | done | `bench/plot.py` |
-| Plain-English walkthrough | planned | `docs/walkthrough.md` |
+| Plain-English walkthrough | done | `docs/walkthrough.md` |
 | Mini-batch k-means trainer (optional) | planned |  |
 | HNSW note (optional) | planned |  |
 
