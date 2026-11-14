@@ -1,0 +1,14 @@
+# Environment and caches
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Large downloaded datasets (fetched by `make fetch`)
+data/
+
+# Agent prompts and tooling stay local
+*prompt*.md
+.claude/
+CLAUDE.md
+.DS_Store
