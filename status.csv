@@ -1,0 +1,10 @@
+item,status,file
+Brute-force search (correctness oracle),planned,vecstore/flat.py
+Lloyd's k-means,planned,vecstore/kmeans.py
+IVF-Flat index,planned,vecstore/ivf.py
+Tests,planned,tests/test_ivf.py
+Benchmark against Faiss,planned,bench/compare.py
+Benchmark charts,planned,bench/plot.py
+Plain-English walkthrough,planned,docs/walkthrough.md
+Mini-batch k-means trainer (optional),planned,
+HNSW note (optional),planned,
