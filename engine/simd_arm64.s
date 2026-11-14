@@ -2,6 +2,15 @@
 
 #include "textflag.h"
 
+// FSUB, FADD and FADDP on four float32 lanes, written as raw machine words.
+// Go 1.23's arm64 assembler does not know these mnemonics. Later versions do.
+// Arguments follow the ARM manual: destination first, then the two sources.
+// The encodings were checked by assembling the mnemonic form with a newer Go
+// and comparing the machine code word for word.
+#define FSUB4S(vd, vn, vm) WORD $(0x4EA0D400 | ((vm)<<16) | ((vn)<<5) | (vd))
+#define FADD4S(vd, vn, vm) WORD $(0x4E20D400 | ((vm)<<16) | ((vn)<<5) | (vd))
+#define FADDP4S(vd, vn, vm) WORD $(0x6E20D400 | ((vm)<<16) | ((vn)<<5) | (vd))
+
 // func l2sqNEON(a, b *float32, n int) float32
 //
 // Four vector accumulators, 16 floats per loop pass. Each pass loads 16
@@ -19,10 +28,10 @@ l2loop:
 	CBZ  R2, l2done
 	VLD1.P 64(R0), [V4.S4, V5.S4, V6.S4, V7.S4]
 	VLD1.P 64(R1), [V16.S4, V17.S4, V18.S4, V19.S4]
-	VFSUB V16.S4, V4.S4, V4.S4
-	VFSUB V17.S4, V5.S4, V5.S4
-	VFSUB V18.S4, V6.S4, V6.S4
-	VFSUB V19.S4, V7.S4, V7.S4
+	FSUB4S(4, 4, 16)
+	FSUB4S(5, 5, 17)
+	FSUB4S(6, 6, 18)
+	FSUB4S(7, 7, 19)
 	VFMLA V4.S4, V4.S4, V0.S4
 	VFMLA V5.S4, V5.S4, V1.S4
 	VFMLA V6.S4, V6.S4, V2.S4
@@ -32,11 +41,11 @@ l2loop:
 
 l2done:
 	// Add the four accumulators, then add the four lanes together.
-	VFADD  V1.S4, V0.S4, V0.S4
-	VFADD  V3.S4, V2.S4, V2.S4
-	VFADD  V2.S4, V0.S4, V0.S4
-	VFADDP V0.S4, V0.S4, V0.S4
-	VFADDP V0.S4, V0.S4, V0.S4
+	FADD4S(0, 0, 1)
+	FADD4S(2, 2, 3)
+	FADD4S(0, 0, 2)
+	FADDP4S(0, 0, 0)
+	FADDP4S(0, 0, 0)
 	FMOVS  F0, ret+24(FP)
 	RET
 
@@ -82,13 +91,13 @@ dotloop:
 
 dotdone:
 	// One vector per row, then pairwise adds fold each into one lane.
-	VFADD  V17.S4, V16.S4, V16.S4
-	VFADD  V19.S4, V18.S4, V18.S4
-	VFADD  V21.S4, V20.S4, V20.S4
-	VFADD  V23.S4, V22.S4, V22.S4
-	VFADDP V18.S4, V16.S4, V28.S4
-	VFADDP V22.S4, V20.S4, V29.S4
-	VFADDP V29.S4, V28.S4, V30.S4
+	FADD4S(16, 16, 17)
+	FADD4S(18, 18, 19)
+	FADD4S(20, 20, 21)
+	FADD4S(22, 22, 23)
+	FADDP4S(28, 16, 18)
+	FADDP4S(29, 20, 22)
+	FADDP4S(30, 28, 29)
 	VST1   [V30.S4], (R7)
 	RET
 
@@ -129,40 +138,40 @@ l4loop:
 	VLD1.P 64(R0), [V0.S4, V1.S4, V2.S4, V3.S4]
 
 	VLD1.P 64(R1), [V4.S4, V5.S4, V6.S4, V7.S4]
-	VFSUB V0.S4, V4.S4, V4.S4
-	VFSUB V1.S4, V5.S4, V5.S4
-	VFSUB V2.S4, V6.S4, V6.S4
-	VFSUB V3.S4, V7.S4, V7.S4
+	FSUB4S(4, 4, 0)
+	FSUB4S(5, 5, 1)
+	FSUB4S(6, 6, 2)
+	FSUB4S(7, 7, 3)
 	VFMLA V4.S4, V4.S4, V16.S4
 	VFMLA V5.S4, V5.S4, V17.S4
 	VFMLA V6.S4, V6.S4, V18.S4
 	VFMLA V7.S4, V7.S4, V19.S4
 
 	VLD1.P 64(R3), [V4.S4, V5.S4, V6.S4, V7.S4]
-	VFSUB V0.S4, V4.S4, V4.S4
-	VFSUB V1.S4, V5.S4, V5.S4
-	VFSUB V2.S4, V6.S4, V6.S4
-	VFSUB V3.S4, V7.S4, V7.S4
+	FSUB4S(4, 4, 0)
+	FSUB4S(5, 5, 1)
+	FSUB4S(6, 6, 2)
+	FSUB4S(7, 7, 3)
 	VFMLA V4.S4, V4.S4, V20.S4
 	VFMLA V5.S4, V5.S4, V21.S4
 	VFMLA V6.S4, V6.S4, V22.S4
 	VFMLA V7.S4, V7.S4, V23.S4
 
 	VLD1.P 64(R4), [V4.S4, V5.S4, V6.S4, V7.S4]
-	VFSUB V0.S4, V4.S4, V4.S4
-	VFSUB V1.S4, V5.S4, V5.S4
-	VFSUB V2.S4, V6.S4, V6.S4
-	VFSUB V3.S4, V7.S4, V7.S4
+	FSUB4S(4, 4, 0)
+	FSUB4S(5, 5, 1)
+	FSUB4S(6, 6, 2)
+	FSUB4S(7, 7, 3)
 	VFMLA V4.S4, V4.S4, V24.S4
 	VFMLA V5.S4, V5.S4, V25.S4
 	VFMLA V6.S4, V6.S4, V26.S4
 	VFMLA V7.S4, V7.S4, V27.S4
 
 	VLD1.P 64(R5), [V4.S4, V5.S4, V6.S4, V7.S4]
-	VFSUB V0.S4, V4.S4, V4.S4
-	VFSUB V1.S4, V5.S4, V5.S4
-	VFSUB V2.S4, V6.S4, V6.S4
-	VFSUB V3.S4, V7.S4, V7.S4
+	FSUB4S(4, 4, 0)
+	FSUB4S(5, 5, 1)
+	FSUB4S(6, 6, 2)
+	FSUB4S(7, 7, 3)
 	VFMLA V4.S4, V4.S4, V28.S4
 	VFMLA V5.S4, V5.S4, V29.S4
 	VFMLA V6.S4, V6.S4, V30.S4
@@ -173,31 +182,31 @@ l4loop:
 
 l4done:
 	// Row 0
-	VFADD  V17.S4, V16.S4, V16.S4
-	VFADD  V19.S4, V18.S4, V18.S4
-	VFADD  V18.S4, V16.S4, V16.S4
-	VFADDP V16.S4, V16.S4, V16.S4
-	VFADDP V16.S4, V16.S4, V16.S4
+	FADD4S(16, 16, 17)
+	FADD4S(18, 18, 19)
+	FADD4S(16, 16, 18)
+	FADDP4S(16, 16, 16)
+	FADDP4S(16, 16, 16)
 	FMOVS  F16, 0(R7)
 	// Row 1
-	VFADD  V21.S4, V20.S4, V20.S4
-	VFADD  V23.S4, V22.S4, V22.S4
-	VFADD  V22.S4, V20.S4, V20.S4
-	VFADDP V20.S4, V20.S4, V20.S4
-	VFADDP V20.S4, V20.S4, V20.S4
+	FADD4S(20, 20, 21)
+	FADD4S(22, 22, 23)
+	FADD4S(20, 20, 22)
+	FADDP4S(20, 20, 20)
+	FADDP4S(20, 20, 20)
 	FMOVS  F20, 4(R7)
 	// Row 2
-	VFADD  V25.S4, V24.S4, V24.S4
-	VFADD  V27.S4, V26.S4, V26.S4
-	VFADD  V26.S4, V24.S4, V24.S4
-	VFADDP V24.S4, V24.S4, V24.S4
-	VFADDP V24.S4, V24.S4, V24.S4
+	FADD4S(24, 24, 25)
+	FADD4S(26, 26, 27)
+	FADD4S(24, 24, 26)
+	FADDP4S(24, 24, 24)
+	FADDP4S(24, 24, 24)
 	FMOVS  F24, 8(R7)
 	// Row 3
-	VFADD  V29.S4, V28.S4, V28.S4
-	VFADD  V31.S4, V30.S4, V30.S4
-	VFADD  V30.S4, V28.S4, V28.S4
-	VFADDP V28.S4, V28.S4, V28.S4
-	VFADDP V28.S4, V28.S4, V28.S4
+	FADD4S(28, 28, 29)
+	FADD4S(30, 30, 31)
+	FADD4S(28, 28, 30)
+	FADDP4S(28, 28, 28)
+	FADDP4S(28, 28, 28)
 	FMOVS  F28, 12(R7)
 	RET
