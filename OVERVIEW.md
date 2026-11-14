@@ -17,7 +17,7 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 | Lloyd's k-means | done | `vecstore/kmeans.py` |
 | IVF-Flat index | done | `vecstore/ivf.py` |
 | Tests | done | `tests/test_ivf.py` |
-| Benchmark against Faiss | planned | `bench/compare.py` |
+| Benchmark against Faiss | done | `bench/compare.py` |
 | Benchmark charts | planned | `bench/plot.py` |
 | Plain-English walkthrough | planned | `docs/walkthrough.md` |
 | Mini-batch k-means trainer (optional) | planned |  |
@@ -29,15 +29,40 @@ Every number below is read from a CSV in `results/`.
 
 ### Recall and queries per second, 200k vectors
 
-no result yet
+| impl | n | nlist | nprobe | recall_at_10 | qps |
+|---|---|---|---|---|---|
+| vecstore | 200000 | 1024 | 1 | 0.3367 | 32173 |
+| faiss | 200000 | 1024 | 1 | 0.3336 | 73689 |
+| faiss_batch | 200000 | 1024 | 1 | 0.3336 | 140056 |
+| vecstore | 200000 | 1024 | 4 | 0.6544 | 16915 |
+| faiss | 200000 | 1024 | 4 | 0.6517 | 36236 |
+| faiss_batch | 200000 | 1024 | 4 | 0.6517 | 127375 |
+| vecstore | 200000 | 1024 | 16 | 0.9071 | 8067 |
+| faiss | 200000 | 1024 | 16 | 0.9067 | 19273 |
+| faiss_batch | 200000 | 1024 | 16 | 0.9067 | 59886 |
+| vecstore | 200000 | 1024 | 64 | 0.9930 | 2637 |
+| faiss | 200000 | 1024 | 64 | 0.9931 | 5014 |
+| faiss_batch | 200000 | 1024 | 64 | 0.9931 | 31513 |
 
 ### Build and write throughput, 200k vectors
 
-no result yet
+| impl | n | nlist | train_s | add_s | add_vectors_per_s |
+|---|---|---|---|---|---|
+| vecstore | 200000 | 1024 | 6.17 | 0.20 | 1001757 |
+| faiss | 200000 | 1024 | 3.16 | 0.18 | 1090719 |
 
 ### Insert throughput by batch size, 200k vectors
 
-no result yet
+| impl | batch_size | vectors | vectors_per_s |
+|---|---|---|---|
+| vecstore | 1 | 5000 | 4649 |
+| faiss | 1 | 5000 | 89756 |
+| vecstore | 100 | 5000 | 88259 |
+| faiss | 100 | 5000 | 119617 |
+| vecstore | 1000 | 5000 | 142491 |
+| faiss | 1000 | 5000 | 884819 |
+| vecstore | 10000 | 10000 | 414907 |
+| faiss | 10000 | 10000 | 902969 |
 
 ### Recall and queries per second, 1M vectors
 
@@ -53,4 +78,6 @@ no result yet
 
 ### Run environment
 
-no result yet
+| run | n | nlist | kmeans_iters | queries | python | numpy | faiss | cpu | peak_rss_mb | flat_agreement_with_faiss |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 200k | 200000 | 1024 | 20 | 10000 | 3.13.17 | 2.5.4 | 1.16.0 | Apple M4 Pro | 2340 | 0.9999 |
