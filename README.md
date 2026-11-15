@@ -120,7 +120,7 @@ On one thread, Faiss is faster on this million-vector set. The gap is widest at 
   <img alt="Insert throughput by batch size on 1,000,000 vectors" src="docs/img/write_throughput_1m_light.png">
 </picture>
 
-Each insert must find the nearest centroid of the new vector. Faiss does this faster for large batches. It hands the work to a tuned matrix library.
+Each insert must find the nearest centroid of the new vector. Faiss does this faster for large batches. It hands the work to a tuned matrix library. Single-vector adds are the slowest case: each compares the new vector with all 4,096 centroids on one core.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/build_time_1m_dark.png">
@@ -287,6 +287,26 @@ The benchmarks ran on a normal desktop with other programs open. Speeds varied b
 - There is no deletion and no saving to disk.
 - `Add` and `Train` must not run during a search.
 - This project claims no new method. It does not claim to beat Faiss.
+
+## Roadmap
+
+Generated from `status.csv`, the same source as `OVERVIEW.md`.
+
+<!-- roadmap:start -->
+- [x] Exact brute-force search (the correctness reference)
+- [x] Lloyd's k-means
+- [x] IVF-Flat index with train / add / search
+- [x] NEON assembly kernels with a portable Go fallback
+- [x] Tests with the race detector; CI on Linux and macOS
+- [x] Benchmark program for the Go engine
+- [x] Faiss baseline and data export (Python)
+- [x] Charts drawn from the result files
+- [x] Plain-English walkthrough
+- [ ] Clear error messages for invalid input
+- [ ] Faster k-means training with a tiled kernel
+- [ ] Mini-batch k-means trainer
+- [ ] Short note on HNSW (graph-based index)
+<!-- roadmap:end -->
 
 ## Run it
 
