@@ -4,11 +4,9 @@
 
 A small vector index written from scratch in Go.
 
-It finds the nearest neighbours of a query among a million vectors. It uses an IVF-Flat index. The hot loops are hand-written arm64 assembly. A portable Go version runs everywhere else.
+It finds the nearest neighbours of a query among a million vectors. It uses an IVF-Flat index. The hot loops are written in arm64 assembly. A portable Go version runs everywhere else.
 
 Python is used only for the benchmark. It runs Faiss, the baseline, and draws the charts.
-
-Everything was written by hand. Faiss is used only as a baseline in `bench/`.
 
 ## What it does
 
@@ -227,7 +225,7 @@ The engine is in `engine/`. It has no dependencies outside the standard library.
 
 A first Go version ran slower than expected. A profile showed the distance loop handling about one number per cycle. The Go compiler does not use vector instructions by itself.
 
-Apple chips have NEON, which works on four numbers per instruction. Three kernels are written by hand: one distance, four distances at once, and a dot product against four centroids.
+Apple chips have NEON, which works on four numbers per instruction. Three kernels are written directly in assembly: one distance, four distances at once, and a dot product against four centroids.
 
 Each kernel has a plain Go twin. Tests compare the two on many lengths. The four-at-once kernel must give the same bits as the one-at-a-time kernel. That keeps exact comparisons with the brute-force index valid.
 
