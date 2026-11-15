@@ -29,10 +29,10 @@ THEMES = {
 }
 # key in the CSV -> (legend label, colour, line style, marker)
 SERIES = {
-    "vecstore_go": ("vecstore, Go engine", "blue", "-", "o"),
-    "faiss": ("faiss IVFFlat, 1 thread", "orange", "-", "s"),
-    "vecstore_go_batch": ("vecstore Go, batched, all cores", "blue", "--", "^"),
-    "faiss_batch": ("faiss, batched, all cores", "orange", "--", "v"),
+    "vecstore_go": ("Go engine, 1 thread", "blue", "-", "o"),
+    "faiss": ("Faiss IVFFlat, 1 thread", "orange", "-", "s"),
+    "vecstore_go_batch": ("Go engine, batched, all cores", "blue", "--", "^"),
+    "faiss_batch": ("Faiss, batched, all cores", "orange", "--", "v"),
 }
 SINGLE = ("vecstore_go", "faiss")
 SIZES = {"200k": "200,000 vectors, nlist 1024", "1m": "1,000,000 vectors, nlist 4096"}
@@ -155,7 +155,7 @@ def chart_recall(tag, rows, theme):
         if key in data:
             line(ax, t, key, [pos[x] for x, _ in data[key]], [y for _, y in data[key]], size, z)
     last = max(pos.values())
-    for key, name, dy in (("vecstore_go", "Go", 9), ("faiss", "faiss", -9)):
+    for key, name, dy in (("vecstore_go", "Go", 9), ("faiss", "Faiss", -9)):
         if key in data:
             end_label(ax, t, last, data[key][-1][1], f"{name} {data[key][-1][1]:.4f}", dy)
     categorical_x(ax, pos, lambda n: f"{int(n)}")
@@ -241,7 +241,7 @@ def chart_build(tag, rows, theme):
     keys = [k for k in SINGLE if any(r["impl"] == k for r in rows)]
     train = {r["impl"]: float(r["train_s"]) for r in rows}
     add = {r["impl"]: float(r["add_s"]) for r in rows}
-    names = {"vecstore_go": "Go engine", "faiss": "faiss"}
+    names = {"vecstore_go": "Go engine", "faiss": "Faiss"}
     peak = max(train[k] + add[k] for k in keys)
     for i, key in enumerate(keys):
         colour = SERIES[key][1]
