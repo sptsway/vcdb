@@ -1,10 +1,19 @@
 package engine
 
 import (
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
 )
+
+// check panics with a clear message when a caller breaks a rule of the API.
+// Misuse is a programming error, so it panics, as the standard library does.
+func check(ok bool, format string, args ...any) {
+	if !ok {
+		panic(fmt.Sprintf("engine: "+format, args...))
+	}
+}
 
 // parallelFor runs fn over 0..n in small chunks shared by a pool of goroutines.
 // workers <= 0 means one worker per CPU core.
