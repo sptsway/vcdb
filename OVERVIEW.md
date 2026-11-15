@@ -13,18 +13,19 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 
 | Item | Status | File |
 |---|---|---|
-| Go engine: brute-force search (correctness oracle) | done | `engine/flat.go` |
-| Go engine: Lloyd's k-means | done | `engine/kmeans.go` |
-| Go engine: IVF-Flat index | done | `engine/ivf.go` |
-| Go engine: NEON kernels for arm64 (portable fallback) | done | `engine/simd_arm64.s` |
-| Go engine: tests (race detector; CI on Linux and macOS) | done | `engine/ivf_test.go` |
-| Go engine: benchmark binary | done | `engine/cmd/vcbench/main.go` |
-| Benchmark harness: Faiss baseline and data export (Python) | done | `bench/compare.py` |
-| Benchmark charts (Python) | done | `bench/plot.py` |
+| Exact brute-force search (the correctness reference) | done | `engine/flat.go` |
+| Lloyd's k-means | done | `engine/kmeans.go` |
+| IVF-Flat index with train / add / search | done | `engine/ivf.go` |
+| NEON assembly kernels with a portable Go fallback | done | `engine/simd_arm64.s` |
+| Tests with the race detector; CI on Linux and macOS | done | `engine/ivf_test.go` |
+| Benchmark program for the Go engine | done | `engine/cmd/vcbench/main.go` |
+| Faiss baseline and data export (Python) | done | `bench/compare.py` |
+| Charts drawn from the result files | done | `bench/plot.py` |
 | Plain-English walkthrough | done | `docs/walkthrough.md` |
-| Tiled kernel to speed up k-means training (optional) | planned |  |
-| Mini-batch k-means trainer (optional) | planned |  |
-| HNSW note (optional) | planned |  |
+| Clear error messages for invalid input | planned |  |
+| Faster k-means training with a tiled kernel | planned |  |
+| Mini-batch k-means trainer | planned |  |
+| Short note on HNSW (graph-based index) | planned |  |
 
 ## Results
 

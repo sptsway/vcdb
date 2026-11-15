@@ -219,10 +219,21 @@ def inject(text, name, body):
     return f"{head}{start}\n{body}\n{end}{tail}"
 
 
+def roadmap():
+    """Checkbox list from status.csv. Done items are ticked."""
+    out = []
+    for item, status, _ in read_csv(ROOT / "status.csv")[1:]:
+        box = "x" if status == "done" else " "
+        note = " (in progress)" if status == "in progress" else ""
+        out.append(f"- [{box}] {item}{note}")
+    return "\n".join(out)
+
+
 def update_readme():
     path = ROOT / "README.md"
     text = path.read_text()
     text = inject(text, "headline", headline())
+    text = inject(text, "roadmap", roadmap())
     text = inject(text, "results", results_for_readme())
     path.write_text(text)
     print("updated README.md")
