@@ -1,13 +1,18 @@
-item,status,file
-Exact brute-force search (the correctness reference),done,engine/flat.go
-Lloyd's k-means,done,engine/kmeans.go
-IVF-Flat index with train / add / search,done,engine/ivf.go
-NEON assembly kernels with a portable Go fallback,done,engine/simd_arm64.s
-Tests with the race detector; CI on Linux and macOS,done,engine/ivf_test.go
-Benchmark program for the Go engine,done,engine/cmd/vcbench/main.go
-Faiss baseline and data export (Python),done,bench/compare.py
-Charts drawn from the result files,done,bench/plot.py
-Plain-English walkthrough,done,docs/walkthrough.md
-Faster k-means training with a tiled kernel,planned,
-Mini-batch k-means trainer,planned,
-Short note on HNSW (graph-based index),planned,
+item,status,file,roadmap
+Exact search as the correctness reference,done,engine/flat.go,Core index
+IVF-Flat index with k-means training,done,engine/ivf.go,Core index
+NEON assembly kernels with a portable Go fallback,done,engine/simd_arm64.s,Core index
+Benchmark against Faiss on one million vectors,done,engine/cmd/vcbench/main.go,Core index
+Tests with the race detector; CI on Linux and macOS,done,engine/ivf_test.go,
+Faiss baseline and data export (Python),done,bench/compare.py,
+Charts drawn from the result files,done,bench/plot.py,
+Plain-English walkthrough,done,docs/walkthrough.md,
+Tiled kernel for faster k-means training,planned,,Speed
+Mini-batch k-means for faster training on large datasets,planned,,Speed
+AVX2 kernels for x86 CPUs,planned,,Speed
+Product quantization (IVF-PQ) to store vectors in a fraction of the memory,planned,,Memory
+HNSW graph index measured against IVF on the same benchmark,planned,,More index types
+Save and load the index from disk,planned,,From index to database
+Delete and update vectors,planned,,From index to database
+Search filtered by metadata,planned,,From index to database
+A small network service so other programs can query it,planned,,From index to database
