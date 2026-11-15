@@ -303,7 +303,7 @@ The core index is built. The next steps make it faster, smaller and more complet
 **Speed**
 
 - [ ] Tiled kernel for faster k-means training
-- [ ] Mini-batch k-means for faster training on large datasets
+- [ ] Mini-batch training with [e-means](https://arxiv.org/abs/2611.09501) measured against Lloyd's k-means
 - [ ] AVX2 kernels for x86 CPUs
 
 **Memory**

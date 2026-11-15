@@ -22,7 +22,7 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 | Charts drawn from the result files | done | `bench/plot.py` |
 | Plain-English walkthrough | done | `docs/walkthrough.md` |
 | Tiled kernel for faster k-means training | planned |  |
-| Mini-batch k-means for faster training on large datasets | planned |  |
+| Mini-batch training with [e-means](https://arxiv.org/abs/2611.09501) measured against Lloyd's k-means | planned |  |
 | AVX2 kernels for x86 CPUs | planned |  |
 | Product quantization (IVF-PQ) to store vectors in a fraction of the memory | planned |  |
 | HNSW graph index measured against IVF on the same benchmark | planned |  |
