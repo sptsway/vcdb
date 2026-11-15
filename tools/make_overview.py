@@ -43,7 +43,7 @@ def md_table(rows):
 def status_section():
     rows = read_csv(ROOT / "status.csv")[1:]
     out = ["| Item | Status | File |", "|---|---|---|"]
-    for item, status, file in rows:
+    for item, status, file, _ in rows:
         if status not in VALID:
             sys.exit(f"bad status {status!r} for {item!r}")
         # A row may only say "done" if its file exists.
@@ -220,13 +220,24 @@ def inject(text, name, body):
 
 
 def roadmap():
-    """Checkbox list from status.csv. Done items are ticked."""
+    """Checkbox list from status.csv, grouped by the roadmap column.
+
+    Rows with an empty roadmap column are project chores. They show in
+    OVERVIEW.md but not in the README roadmap.
+    """
+    phases = {}
+    for item, status, _, phase in read_csv(ROOT / "status.csv")[1:]:
+        if phase:
+            phases.setdefault(phase, []).append((item, status))
     out = []
-    for item, status, _ in read_csv(ROOT / "status.csv")[1:]:
-        box = "x" if status == "done" else " "
-        note = " (in progress)" if status == "in progress" else ""
-        out.append(f"- [{box}] {item}{note}")
-    return "\n".join(out)
+    for phase, items in phases.items():
+        out += [f"**{phase}**", ""]
+        for item, status in items:
+            box = "x" if status == "done" else " "
+            note = " (in progress)" if status == "in progress" else ""
+            out.append(f"- [{box}] {item}{note}")
+        out.append("")
+    return "\n".join(out).rstrip()
 
 
 def update_readme():

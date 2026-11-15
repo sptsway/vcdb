@@ -290,21 +290,36 @@ The benchmarks ran on a normal desktop with other programs open. Speeds varied b
 
 ## Roadmap
 
-Generated from `status.csv`, the same source as `OVERVIEW.md`.
+The core index is built. The next steps make it faster, smaller and more complete. The long-term goal is a small vector database.
 
 <!-- roadmap:start -->
-- [x] Exact brute-force search (the correctness reference)
-- [x] Lloyd's k-means
-- [x] IVF-Flat index with train / add / search
+**Core index**
+
+- [x] Exact search as the correctness reference
+- [x] IVF-Flat index with k-means training
 - [x] NEON assembly kernels with a portable Go fallback
-- [x] Tests with the race detector; CI on Linux and macOS
-- [x] Benchmark program for the Go engine
-- [x] Faiss baseline and data export (Python)
-- [x] Charts drawn from the result files
-- [x] Plain-English walkthrough
-- [ ] Faster k-means training with a tiled kernel
-- [ ] Mini-batch k-means trainer
-- [ ] Short note on HNSW (graph-based index)
+- [x] Benchmark against Faiss on one million vectors
+
+**Speed**
+
+- [ ] Tiled kernel for faster k-means training
+- [ ] Mini-batch k-means for faster training on large datasets
+- [ ] AVX2 kernels for x86 CPUs
+
+**Memory**
+
+- [ ] Product quantization (IVF-PQ) to store vectors in a fraction of the memory
+
+**More index types**
+
+- [ ] HNSW graph index measured against IVF on the same benchmark
+
+**From index to database**
+
+- [ ] Save and load the index from disk
+- [ ] Delete and update vectors
+- [ ] Search filtered by metadata
+- [ ] A small network service so other programs can query it
 <!-- roadmap:end -->
 
 ## Run it

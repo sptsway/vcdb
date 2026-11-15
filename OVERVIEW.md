@@ -13,18 +13,23 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 
 | Item | Status | File |
 |---|---|---|
-| Exact brute-force search (the correctness reference) | done | `engine/flat.go` |
-| Lloyd's k-means | done | `engine/kmeans.go` |
-| IVF-Flat index with train / add / search | done | `engine/ivf.go` |
+| Exact search as the correctness reference | done | `engine/flat.go` |
+| IVF-Flat index with k-means training | done | `engine/ivf.go` |
 | NEON assembly kernels with a portable Go fallback | done | `engine/simd_arm64.s` |
+| Benchmark against Faiss on one million vectors | done | `engine/cmd/vcbench/main.go` |
 | Tests with the race detector; CI on Linux and macOS | done | `engine/ivf_test.go` |
-| Benchmark program for the Go engine | done | `engine/cmd/vcbench/main.go` |
 | Faiss baseline and data export (Python) | done | `bench/compare.py` |
 | Charts drawn from the result files | done | `bench/plot.py` |
 | Plain-English walkthrough | done | `docs/walkthrough.md` |
-| Faster k-means training with a tiled kernel | planned |  |
-| Mini-batch k-means trainer | planned |  |
-| Short note on HNSW (graph-based index) | planned |  |
+| Tiled kernel for faster k-means training | planned |  |
+| Mini-batch k-means for faster training on large datasets | planned |  |
+| AVX2 kernels for x86 CPUs | planned |  |
+| Product quantization (IVF-PQ) to store vectors in a fraction of the memory | planned |  |
+| HNSW graph index measured against IVF on the same benchmark | planned |  |
+| Save and load the index from disk | planned |  |
+| Delete and update vectors | planned |  |
+| Search filtered by metadata | planned |  |
+| A small network service so other programs can query it | planned |  |
 
 ## Results
 
