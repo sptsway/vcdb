@@ -98,7 +98,7 @@ A plain Go loop handles about one number per cycle. The Go compiler does not use
 
 Apple chips have NEON. One NEON instruction works on four numbers at once.
 
-So the hot loops are written by hand in arm64 assembly. There are three of them.
+So the hot loops are written directly in arm64 assembly. There are three of them.
 
 `l2sqNEON` computes one squared distance. `l2sq4NEON` computes four at once against one query.
 

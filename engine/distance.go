@@ -3,7 +3,7 @@ package engine
 // L2Sq returns the squared L2 distance between a and b.
 //
 // The square root is skipped because it never changes the order of
-// neighbours. On arm64 the work runs in hand-written NEON assembly
+// neighbours. On arm64 the work runs in NEON assembly
 // (simd_arm64.s). Other CPUs use the plain Go loop below.
 //
 // Flat and IVF both call this one function, so their distances for the
