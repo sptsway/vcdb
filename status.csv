@@ -8,7 +8,7 @@ Faiss baseline and data export (Python),done,bench/compare.py,
 Charts drawn from the result files,done,bench/plot.py,
 Plain-English walkthrough,done,docs/walkthrough.md,
 Tiled kernel for faster k-means training,planned,,Speed
-Mini-batch k-means for faster training on large datasets,planned,,Speed
+Mini-batch training with [e-means](https://arxiv.org/abs/2611.09501) measured against Lloyd's k-means,planned,,Speed
 AVX2 kernels for x86 CPUs,planned,,Speed
 Product quantization (IVF-PQ) to store vectors in a fraction of the memory,planned,,Memory
 HNSW graph index measured against IVF on the same benchmark,planned,,More index types
