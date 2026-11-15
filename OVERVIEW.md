@@ -22,7 +22,6 @@ This project claims no new idea. It claims no speed advantage over Faiss.
 | Faiss baseline and data export (Python) | done | `bench/compare.py` |
 | Charts drawn from the result files | done | `bench/plot.py` |
 | Plain-English walkthrough | done | `docs/walkthrough.md` |
-| Clear error messages for invalid input | planned |  |
 | Faster k-means training with a tiled kernel | planned |  |
 | Mini-batch k-means trainer | planned |  |
 | Short note on HNSW (graph-based index) | planned |  |

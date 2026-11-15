@@ -1,9 +1,6 @@
 package engine
 
-import (
-	"fmt"
-	"sync"
-)
+import "sync"
 
 // IVF is an inverted-file index with exact distances inside each list.
 //
@@ -46,6 +43,8 @@ func (ix *IVF) Len() int { return ix.ntotal }
 // Train learns the list centroids from a sample of vectors. It returns the
 // k-means loss of each round. workers <= 0 uses every CPU core.
 func (ix *IVF) Train(x []float32, iters, workers int) []float64 {
+	check(len(x)%ix.dim == 0, "%d floats is not a multiple of dim %d", len(x), ix.dim)
+	check(len(x)/ix.dim >= ix.nlist, "training needs at least nlist (%d) vectors, got %d", ix.nlist, len(x)/ix.dim)
 	var losses []float64
 	ix.cents, losses = KMeans(x, ix.dim, ix.nlist, iters, ix.seed, workers)
 	return losses
@@ -56,9 +55,8 @@ func (ix *IVF) Train(x []float32, iters, workers int) []float64 {
 func (ix *IVF) Add(x []float32, ids []int64, workers int) {
 	ix.mustBeTrained()
 	n := len(x) / ix.dim
-	if len(x)%ix.dim != 0 || (ids != nil && len(ids) != n) {
-		panic(fmt.Sprintf("engine: %d floats and %d ids do not match dim %d", len(x), len(ids), ix.dim))
-	}
+	check(len(x)%ix.dim == 0, "%d floats is not a multiple of dim %d", len(x), ix.dim)
+	check(ids == nil || len(ids) == n, "%d vectors but %d ids", n, len(ids))
 	labels, _ := ix.cents.Assign(x, workers)
 	for i, l := range labels {
 		ix.vecs[l] = append(ix.vecs[l], x[i*ix.dim:(i+1)*ix.dim]...)
@@ -74,6 +72,9 @@ func (ix *IVF) Add(x []float32, ids []int64, workers int) {
 // Search returns the k nearest vectors to q, best first.
 func (ix *IVF) Search(q []float32, k, nprobe int) []Neighbor {
 	ix.mustBeTrained()
+	check(k >= 1, "k is %d, it must be at least 1", k)
+	check(nprobe >= 1, "nprobe is %d, it must be at least 1", nprobe)
+	check(len(q) == ix.dim, "the query has %d floats, the index has dim %d", len(q), ix.dim)
 	nprobe = min(nprobe, ix.nlist)
 
 	buf := ix.scratch.Get().(*searchBuf)
@@ -98,6 +99,7 @@ func (ix *IVF) Search(q []float32, k, nprobe int) []Neighbor {
 
 // SearchBatch answers many queries at once. qs holds the queries back to back.
 func (ix *IVF) SearchBatch(qs []float32, k, nprobe, workers int) [][]Neighbor {
+	check(len(qs)%ix.dim == 0, "%d floats is not a multiple of dim %d", len(qs), ix.dim)
 	nq := len(qs) / ix.dim
 	out := make([][]Neighbor, nq)
 	parallelFor(nq, workers, func(lo, hi int) {
@@ -109,7 +111,5 @@ func (ix *IVF) SearchBatch(qs []float32, k, nprobe, workers int) [][]Neighbor {
 }
 
 func (ix *IVF) mustBeTrained() {
-	if ix.cents == nil {
-		panic("engine: IVF used before Train")
-	}
+	check(ix.cents != nil, "IVF used before Train")
 }

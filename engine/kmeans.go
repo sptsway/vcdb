@@ -15,6 +15,7 @@ import "math/rand/v2"
 // It returns the final centroids and the loss measured at each round.
 func KMeans(x []float32, dim, k, iters int, seed uint64, workers int) (*Centroids, []float64) {
 	n := len(x) / dim
+	check(k >= 1 && k <= n, "k is %d, it must be between 1 and the number of vectors (%d)", k, n)
 	rng := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15))
 
 	// Start from k distinct random points of the data.

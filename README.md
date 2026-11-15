@@ -302,7 +302,6 @@ Generated from `status.csv`, the same source as `OVERVIEW.md`.
 - [x] Faiss baseline and data export (Python)
 - [x] Charts drawn from the result files
 - [x] Plain-English walkthrough
-- [ ] Clear error messages for invalid input
 - [ ] Faster k-means training with a tiled kernel
 - [ ] Mini-batch k-means trainer
 - [ ] Short note on HNSW (graph-based index)
